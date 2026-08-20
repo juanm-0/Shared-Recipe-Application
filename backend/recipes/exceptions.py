@@ -18,3 +18,12 @@ class TagLimitExceeded(APIException):
 
     def __init__(self, count):
         super().__init__(detail=f"A recipe can have at most 5 tags (received {count}).")
+
+
+class DuplicateReview(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "duplicate_review"
+
+    def __init__(self, review_id):
+        super().__init__(detail="You have already reviewed this recipe.")
+        self.extra_context = {"review_id": review_id}
