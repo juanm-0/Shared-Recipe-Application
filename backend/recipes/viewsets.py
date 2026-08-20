@@ -91,19 +91,24 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         if self.action != "list":
-            return Recipe.objects.select_related("owner").prefetch_related(
-                Prefetch(
-                    "recipe_tags",
-                    queryset=RecipeTag.objects.select_related("tag").order_by("order"),
-                ),
-                Prefetch(
-                    "recipe_ingredients",
-                    queryset=RecipeIngredient.objects.select_related("ingredient").order_by("order"),
-                ),
-                Prefetch("reviews", queryset=Review.objects.select_related("user").order_by("-created_at")),
-            )
+            return self._detail_queryset()
+        return self._apply_sort(self._apply_filters(self._list_queryset()))
 
-        queryset = Recipe.objects.annotate(
+    def _detail_queryset(self):
+        return Recipe.objects.select_related("owner").prefetch_related(
+            Prefetch(
+                "recipe_tags",
+                queryset=RecipeTag.objects.select_related("tag").order_by("order"),
+            ),
+            Prefetch(
+                "recipe_ingredients",
+                queryset=RecipeIngredient.objects.select_related("ingredient").order_by("order"),
+            ),
+            Prefetch("reviews", queryset=Review.objects.select_related("user").order_by("-created_at")),
+        )
+
+    def _list_queryset(self):
+        return Recipe.objects.annotate(
             average_rating=Avg("reviews__rating"),
             review_count=Count("reviews", distinct=True),
         ).prefetch_related(
@@ -113,6 +118,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             )
         )
 
+    def _apply_filters(self, queryset):
         params = self.request.query_params
 
         tag = _int_param(params, "tag")
@@ -131,12 +137,12 @@ class RecipeViewSet(viewsets.ModelViewSet):
         if min_rating is not None:
             queryset = queryset.filter(average_rating__gte=min_rating)
 
-        sort = params.get("sort", "-created_at")
-        if sort == "rating":
-            queryset = queryset.order_by(F("average_rating").asc(nulls_last=True), "-pk")
-        elif sort == "-rating":
-            queryset = queryset.order_by(F("average_rating").desc(nulls_last=True), "-pk")
-        else:
-            queryset = queryset.order_by(SORT_FIELDS.get(sort, "-created_at"), "-pk")
-
         return queryset
+
+    def _apply_sort(self, queryset):
+        sort = self.request.query_params.get("sort", "-created_at")
+        if sort == "rating":
+            return queryset.order_by(F("average_rating").asc(nulls_last=True), "-pk")
+        if sort == "-rating":
+            return queryset.order_by(F("average_rating").desc(nulls_last=True), "-pk")
+        return queryset.order_by(SORT_FIELDS.get(sort, "-created_at"), "-pk")
