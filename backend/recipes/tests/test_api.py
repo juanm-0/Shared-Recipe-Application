@@ -234,3 +234,104 @@ def test_recipe_create_requires_authentication():
     }
     response = client.post("/api/recipes/", payload, format="json")
     assert response.status_code == 401
+
+
+def test_recipe_update_happy_path():
+    owner = User.objects.create_user(username="chef12", password="pw12345")
+    recipe = Recipe.objects.create(name="Soup", steps=["Boil"], owner=owner)
+    flour = Ingredient.objects.create(name="Flour12")
+    RecipeIngredient.objects.create(
+        recipe=recipe, ingredient=flour, amount=Decimal("1"), unit="cup", order=1
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    payload = {
+        "name": "Better Soup",
+        "expected_updated_at": recipe.updated_at.isoformat(),
+    }
+    response = client.patch(f"/api/recipes/{recipe.id}/", payload, format="json")
+    assert response.status_code == 200
+    assert response.data["name"] == "Better Soup"
+
+
+def test_recipe_update_rejects_stale_write():
+    owner = User.objects.create_user(username="chef13", password="pw12345")
+    recipe = Recipe.objects.create(name="Soup", steps=["Boil"], owner=owner)
+
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    response = client.patch(
+        f"/api/recipes/{recipe.id}/",
+        {"name": "New Name", "expected_updated_at": "2000-01-01T00:00:00Z"},
+        format="json",
+    )
+    assert response.status_code == 409
+    assert response.data["code"] == "stale_write"
+    assert response.data["current"]["name"] == "Soup"
+
+
+def test_recipe_update_requires_expected_updated_at():
+    owner = User.objects.create_user(username="chef13b", password="pw12345")
+    recipe = Recipe.objects.create(name="Soup", steps=["Boil"], owner=owner)
+
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    response = client.patch(f"/api/recipes/{recipe.id}/", {"name": "New Name"}, format="json")
+    assert response.status_code == 400
+
+
+def test_recipe_update_rejects_non_owner():
+    owner = User.objects.create_user(username="chef14", password="pw12345")
+    other = User.objects.create_user(username="other14", password="pw12345")
+    recipe = Recipe.objects.create(name="Soup", steps=["Boil"], owner=owner)
+
+    client = APIClient()
+    client.force_authenticate(user=other)
+    response = client.patch(
+        f"/api/recipes/{recipe.id}/",
+        {"name": "Hijacked", "expected_updated_at": recipe.updated_at.isoformat()},
+        format="json",
+    )
+    assert response.status_code == 403
+
+
+def test_recipe_update_replaces_tags_fully():
+    owner = User.objects.create_user(username="chef15", password="pw12345")
+    old_tag = Tag.objects.create(name="Old15")
+    recipe = Recipe.objects.create(name="Soup", steps=["Boil"], owner=owner)
+    RecipeTag.objects.create(recipe=recipe, tag=old_tag, order=0)
+
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    response = client.patch(
+        f"/api/recipes/{recipe.id}/",
+        {"tags": ["New15"], "expected_updated_at": recipe.updated_at.isoformat()},
+        format="json",
+    )
+    assert response.status_code == 200
+    assert [t["name"] for t in response.data["tags"]] == ["New15"]
+    assert not RecipeTag.objects.filter(tag=old_tag).exists()
+
+
+def test_recipe_delete_happy_path():
+    owner = User.objects.create_user(username="chef16", password="pw12345")
+    recipe = Recipe.objects.create(name="Soup", steps=["Boil"], owner=owner)
+
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    response = client.delete(f"/api/recipes/{recipe.id}/")
+    assert response.status_code == 204
+    assert not Recipe.objects.filter(id=recipe.id).exists()
+
+
+def test_recipe_delete_rejects_non_owner():
+    owner = User.objects.create_user(username="chef17", password="pw12345")
+    other = User.objects.create_user(username="other17", password="pw12345")
+    recipe = Recipe.objects.create(name="Soup", steps=["Boil"], owner=owner)
+
+    client = APIClient()
+    client.force_authenticate(user=other)
+    response = client.delete(f"/api/recipes/{recipe.id}/")
+    assert response.status_code == 403
+    assert Recipe.objects.filter(id=recipe.id).exists()

@@ -1,7 +1,7 @@
 from django.db import transaction
 from rest_framework import serializers
 from accounts.permissions import is_owner_or_staff
-from .exceptions import TagLimitExceeded
+from .exceptions import StaleWrite, TagLimitExceeded
 from .models import Ingredient, Recipe, RecipeIngredient, RecipeTag, Review, Tag
 from .utils import get_or_create_ci
 
@@ -85,10 +85,11 @@ class RecipeIngredientWriteSerializer(serializers.Serializer):
 class RecipeWriteSerializer(serializers.ModelSerializer):
     ingredients = RecipeIngredientWriteSerializer(many=True)
     tags = serializers.ListField(child=serializers.CharField(max_length=100), required=False, default=list)
+    expected_updated_at = serializers.DateTimeField(write_only=True, required=False)
 
     class Meta:
         model = Recipe
-        fields = ["name", "steps", "image", "ingredients", "tags"]
+        fields = ["name", "steps", "image", "ingredients", "tags", "expected_updated_at"]
 
     def validate_ingredients(self, value):
         if not value:
@@ -105,6 +106,19 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
             raise TagLimitExceeded(count=len(value))
         return value
 
+    def validate(self, attrs):
+        if self.instance is not None:
+            expected = attrs.get("expected_updated_at")
+            if expected is None:
+                raise serializers.ValidationError(
+                    {"expected_updated_at": "This field is required for updates."}
+                )
+            if expected != self.instance.updated_at:
+                raise StaleWrite(
+                    current_data=RecipeDetailSerializer(self.instance, context=self.context).data
+                )
+        return attrs
+
     def create(self, validated_data):
         ingredients_data = validated_data.pop("ingredients")
         tags_data = validated_data.pop("tags", [])
@@ -115,6 +129,24 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
             self._set_ingredients(recipe, ingredients_data)
             self._set_tags(recipe, tags_data)
         return recipe
+
+    def update(self, instance, validated_data):
+        validated_data.pop("expected_updated_at", None)
+        ingredients_data = validated_data.pop("ingredients", None)
+        tags_data = validated_data.pop("tags", None)
+
+        with transaction.atomic():
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
+            instance.save()
+
+            if ingredients_data is not None:
+                self._set_ingredients(instance, ingredients_data)
+            if tags_data is not None:
+                self._set_tags(instance, tags_data)
+
+        instance.refresh_from_db()
+        return instance
 
     def _set_ingredients(self, recipe, ingredients_data):
         recipe.recipe_ingredients.all().delete()

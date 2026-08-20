@@ -1,9 +1,10 @@
 from django.db.models import Avg, Count, Prefetch
-from rest_framework import mixins, status, viewsets
+from rest_framework import status, viewsets
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 
+from accounts.permissions import IsOwnerOrStaff
 from .models import Ingredient, Recipe, RecipeIngredient, RecipeTag, Review, Tag
 from .serializers import (
     IngredientSerializer,
@@ -38,13 +39,13 @@ SORT_FIELDS = {
 }
 
 
-class RecipeViewSet(
-    mixins.ListModelMixin,
-    mixins.RetrieveModelMixin,
-    mixins.CreateModelMixin,
-    viewsets.GenericViewSet,
-):
+class RecipeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly]
+
+    def get_permissions(self):
+        if self.action in ("update", "partial_update", "destroy"):
+            return [IsAuthenticatedOrReadOnly(), IsOwnerOrStaff()]
+        return [permission() for permission in self.permission_classes]
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -59,6 +60,15 @@ class RecipeViewSet(
         recipe = serializer.save()
         output_serializer = RecipeDetailSerializer(recipe, context=self.get_serializer_context())
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        recipe = serializer.save()
+        output_serializer = RecipeDetailSerializer(recipe, context=self.get_serializer_context())
+        return Response(output_serializer.data, status=status.HTTP_200_OK)
 
     def get_queryset(self):
         queryset = Recipe.objects.annotate(
