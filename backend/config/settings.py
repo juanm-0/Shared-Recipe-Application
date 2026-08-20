@@ -94,6 +94,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ],
+    "EXCEPTION_HANDLER": "config.exception_handlers.custom_exception_handler",
 }
 
 CSRF_COOKIE_HTTPONLY = False
