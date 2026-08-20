@@ -76,3 +76,78 @@ def test_review_create_requires_authentication():
         f"/api/recipes/{recipe.id}/reviews/", {"rating": 5, "comment": "x"}, format="json"
     )
     assert response.status_code == 401
+
+
+def test_review_update_happy_path():
+    owner = User.objects.create_user(username="chef6", password="pw12345")
+    reviewer = User.objects.create_user(username="reviewer6", password="pw12345")
+    recipe = _make_recipe(owner)
+    review = Review.objects.create(recipe=recipe, user=reviewer, rating=3, comment="Ok")
+
+    client = APIClient()
+    client.force_authenticate(user=reviewer)
+    response = client.patch(
+        f"/api/recipes/{recipe.id}/reviews/{review.id}/", {"rating": 5}, format="json"
+    )
+    assert response.status_code == 200
+    assert response.data["rating"] == 5
+    assert response.data["comment"] == "Ok"
+
+
+def test_review_update_rejects_non_author():
+    owner = User.objects.create_user(username="chef7", password="pw12345")
+    reviewer = User.objects.create_user(username="reviewer7", password="pw12345")
+    other = User.objects.create_user(username="other7", password="pw12345")
+    recipe = _make_recipe(owner)
+    review = Review.objects.create(recipe=recipe, user=reviewer, rating=3, comment="Ok")
+
+    client = APIClient()
+    client.force_authenticate(user=other)
+    response = client.patch(
+        f"/api/recipes/{recipe.id}/reviews/{review.id}/", {"rating": 1}, format="json"
+    )
+    assert response.status_code == 403
+    review.refresh_from_db()
+    assert review.rating == 3
+
+
+def test_review_delete_happy_path():
+    owner = User.objects.create_user(username="chef8", password="pw12345")
+    reviewer = User.objects.create_user(username="reviewer8", password="pw12345")
+    recipe = _make_recipe(owner)
+    review = Review.objects.create(recipe=recipe, user=reviewer, rating=3, comment="Ok")
+
+    client = APIClient()
+    client.force_authenticate(user=reviewer)
+    response = client.delete(f"/api/recipes/{recipe.id}/reviews/{review.id}/")
+    assert response.status_code == 204
+    assert not Review.objects.filter(id=review.id).exists()
+
+
+def test_review_delete_rejects_non_author():
+    owner = User.objects.create_user(username="chef9", password="pw12345")
+    reviewer = User.objects.create_user(username="reviewer9", password="pw12345")
+    other = User.objects.create_user(username="other9", password="pw12345")
+    recipe = _make_recipe(owner)
+    review = Review.objects.create(recipe=recipe, user=reviewer, rating=3, comment="Ok")
+
+    client = APIClient()
+    client.force_authenticate(user=other)
+    response = client.delete(f"/api/recipes/{recipe.id}/reviews/{review.id}/")
+    assert response.status_code == 403
+    assert Review.objects.filter(id=review.id).exists()
+
+
+def test_staff_can_update_any_review():
+    owner = User.objects.create_user(username="chef10", password="pw12345")
+    reviewer = User.objects.create_user(username="reviewer10", password="pw12345")
+    staff = User.objects.create_user(username="staff10", password="pw12345", is_staff=True)
+    recipe = _make_recipe(owner)
+    review = Review.objects.create(recipe=recipe, user=reviewer, rating=3, comment="Ok")
+
+    client = APIClient()
+    client.force_authenticate(user=staff)
+    response = client.patch(
+        f"/api/recipes/{recipe.id}/reviews/{review.id}/", {"rating": 1}, format="json"
+    )
+    assert response.status_code == 200

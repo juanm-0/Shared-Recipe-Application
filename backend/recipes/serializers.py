@@ -190,3 +190,9 @@ class ReviewWriteSerializer(serializers.Serializer):
             user=self.context["request"].user,
             **validated_data,
         )
+
+    def update(self, instance, validated_data):
+        instance.rating = validated_data.get("rating", instance.rating)
+        instance.comment = validated_data.get("comment", instance.comment)
+        instance.save()
+        return instance
