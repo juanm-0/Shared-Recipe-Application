@@ -104,6 +104,8 @@ class RecipeIngredient(models.Model):
 
 
 class RecipeTag(models.Model):
+    MAX_TAGS = 5
+
     recipe = models.ForeignKey(
         Recipe, on_delete=models.CASCADE, related_name="recipe_tags"
     )
@@ -121,9 +123,9 @@ class RecipeTag(models.Model):
         existing_count = (
             RecipeTag.objects.filter(recipe=self.recipe).exclude(pk=self.pk).count()
         )
-        if existing_count >= 5:
+        if existing_count >= RecipeTag.MAX_TAGS:
             raise ValidationError(
-                f"Recipe already has the maximum of 5 tags (currently {existing_count})."
+                f"Recipe already has the maximum of {RecipeTag.MAX_TAGS} tags (currently {existing_count})."
             )
 
     def __str__(self):

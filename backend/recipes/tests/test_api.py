@@ -1,11 +1,16 @@
 from decimal import Decimal
 
 import pytest
+from django.contrib.auth import get_user_model
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIClient
 
-from recipes.models import Ingredient, RecipeIngredient, Tag
+from recipes.models import Ingredient, Recipe, RecipeIngredient, RecipeTag, Review, Tag
 
 pytestmark = pytest.mark.django_db
+
+User = get_user_model()
 
 
 def test_list_tags_is_public_and_unpaginated():
@@ -25,15 +30,6 @@ def test_list_ingredients_is_public_and_unpaginated():
     assert response.status_code == 200
     assert isinstance(response.data, list)
     assert len(response.data) == 1
-
-
-from django.contrib.auth import get_user_model
-from django.db import connection
-from django.test.utils import CaptureQueriesContext
-
-from recipes.models import Recipe, RecipeTag, Review
-
-User = get_user_model()
 
 
 def _make_recipe(owner, name="Soup", tags=None):
@@ -109,6 +105,19 @@ def test_recipe_list_query_count_stays_flat_as_dataset_grows():
     assert response.status_code == 200
     assert response.data["count"] == 11
     assert len(many_recipe_queries.captured_queries) == len(one_recipe_queries.captured_queries)
+
+
+def test_average_rating_is_correct_when_tag_filter_is_applied():
+    owner = User.objects.create_user(username="chefavg", password="pw12345")
+    r1 = User.objects.create_user(username="rev1", password="pw12345")
+    r2 = User.objects.create_user(username="rev2", password="pw12345")
+    tag = Tag.objects.create(name="TagAvg")
+    recipe = _make_recipe(owner, name="Rated", tags=[tag])
+    Review.objects.create(recipe=recipe, user=r1, rating=2, comment="")
+    Review.objects.create(recipe=recipe, user=r2, rating=4, comment="")
+    response = APIClient().get(f"/api/recipes/?tag={tag.id}")
+    assert response.data["results"][0]["average_rating"] == 3.0
+    assert response.data["results"][0]["review_count"] == 2
 
 
 def test_recipe_detail_returns_full_payload():
@@ -223,6 +232,8 @@ def test_recipe_create_rejects_duplicate_ingredient_in_one_payload():
     response = client.post("/api/recipes/", payload, format="json")
     assert response.status_code == 400
     assert response.data["code"] == "validation_error"
+    assert not Recipe.objects.filter(name="Double Flour").exists()
+    assert not RecipeIngredient.objects.filter(ingredient__name="Flour11b").exists()
 
 
 def test_recipe_create_requires_authentication():
@@ -312,6 +323,29 @@ def test_recipe_update_replaces_tags_fully():
     assert response.status_code == 200
     assert [t["name"] for t in response.data["tags"]] == ["New15"]
     assert not RecipeTag.objects.filter(tag=old_tag).exists()
+
+
+def test_recipe_patch_without_tags_or_ingredients_preserves_them():
+    owner = User.objects.create_user(username="chef18", password="pw12345")
+    tag = Tag.objects.create(name="Tag18")
+    ingredient = Ingredient.objects.create(name="Ingredient18")
+    recipe = Recipe.objects.create(name="Original", steps=["Step"], owner=owner)
+    RecipeTag.objects.create(recipe=recipe, tag=tag, order=0)
+    RecipeIngredient.objects.create(
+        recipe=recipe, ingredient=ingredient, amount=Decimal("1"), unit="cup", order=0
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    response = client.patch(
+        f"/api/recipes/{recipe.id}/",
+        {"name": "Renamed", "expected_updated_at": recipe.updated_at.isoformat()},
+        format="json",
+    )
+    assert response.status_code == 200
+    assert response.data["name"] == "Renamed"
+    assert [t["name"] for t in response.data["tags"]] == ["Tag18"]
+    assert response.data["ingredients"][0]["ingredient_name"] == "Ingredient18"
 
 
 def test_recipe_delete_happy_path():

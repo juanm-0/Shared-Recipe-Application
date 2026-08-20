@@ -1,5 +1,6 @@
-from django.db.models import Avg, Count, Prefetch
+from django.db.models import Avg, Count, F, Prefetch
 from rest_framework import status, viewsets
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
@@ -13,6 +14,26 @@ from .serializers import (
     RecipeWriteSerializer,
     TagSerializer,
 )
+
+
+def _int_param(params, key):
+    raw = params.get(key)
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        raise ValidationError({key: "Must be an integer."})
+
+
+def _float_param(params, key):
+    raw = params.get(key)
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        raise ValidationError({key: "Must be a number."})
 
 
 class TagListView(ListAPIView):
@@ -32,8 +53,6 @@ class IngredientListView(ListAPIView):
 SORT_FIELDS = {
     "name": "name",
     "-name": "-name",
-    "rating": "average_rating",
-    "-rating": "-average_rating",
     "created_at": "created_at",
     "-created_at": "-created_at",
 }
@@ -71,20 +90,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return Response(output_serializer.data, status=status.HTTP_200_OK)
 
     def get_queryset(self):
-        queryset = Recipe.objects.annotate(
-            average_rating=Avg("reviews__rating"),
-            review_count=Count("reviews", distinct=True),
-        )
-
-        if self.action == "list":
-            queryset = queryset.prefetch_related(
-                Prefetch(
-                    "recipe_tags",
-                    queryset=RecipeTag.objects.select_related("tag").order_by("order"),
-                )
-            )
-        else:
-            queryset = queryset.select_related("owner", "original_recipe").prefetch_related(
+        if self.action != "list":
+            return Recipe.objects.select_related("owner").prefetch_related(
                 Prefetch(
                     "recipe_tags",
                     queryset=RecipeTag.objects.select_related("tag").order_by("order"),
@@ -93,28 +100,43 @@ class RecipeViewSet(viewsets.ModelViewSet):
                     "recipe_ingredients",
                     queryset=RecipeIngredient.objects.select_related("ingredient").order_by("order"),
                 ),
-                Prefetch("reviews", queryset=Review.objects.select_related("user")),
+                Prefetch("reviews", queryset=Review.objects.select_related("user").order_by("-created_at")),
             )
+
+        queryset = Recipe.objects.annotate(
+            average_rating=Avg("reviews__rating"),
+            review_count=Count("reviews", distinct=True),
+        ).prefetch_related(
+            Prefetch(
+                "recipe_tags",
+                queryset=RecipeTag.objects.select_related("tag").order_by("order"),
+            )
+        )
 
         params = self.request.query_params
 
-        tag = params.get("tag")
-        if tag:
+        tag = _int_param(params, "tag")
+        if tag is not None:
             queryset = queryset.filter(recipe_tags__tag_id=tag)
 
-        ingredient = params.get("ingredient")
-        if ingredient:
+        ingredient = _int_param(params, "ingredient")
+        if ingredient is not None:
             queryset = queryset.filter(recipe_ingredients__ingredient_id=ingredient)
 
-        owner = params.get("owner")
-        if owner:
+        owner = _int_param(params, "owner")
+        if owner is not None:
             queryset = queryset.filter(owner_id=owner)
 
-        min_rating = params.get("min_rating")
-        if min_rating:
+        min_rating = _float_param(params, "min_rating")
+        if min_rating is not None:
             queryset = queryset.filter(average_rating__gte=min_rating)
 
         sort = params.get("sort", "-created_at")
-        queryset = queryset.order_by(SORT_FIELDS.get(sort, "-created_at"))
+        if sort == "rating":
+            queryset = queryset.order_by(F("average_rating").asc(nulls_last=True), "-pk")
+        elif sort == "-rating":
+            queryset = queryset.order_by(F("average_rating").desc(nulls_last=True), "-pk")
+        else:
+            queryset = queryset.order_by(SORT_FIELDS.get(sort, "-created_at"), "-pk")
 
         return queryset

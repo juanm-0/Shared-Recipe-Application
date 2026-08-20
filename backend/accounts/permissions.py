@@ -15,5 +15,7 @@ def is_owner_or_staff(user, obj):
 
 
 class IsOwnerOrStaff(BasePermission):
+    """DRF permission wrapper around is_owner_or_staff()."""
+
     def has_object_permission(self, request, view, obj):
         return is_owner_or_staff(request.user, obj)

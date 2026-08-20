@@ -102,7 +102,7 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         return value
 
     def validate_tags(self, value):
-        if len(value) > 5:
+        if len(value) > RecipeTag.MAX_TAGS:
             raise TagLimitExceeded(count=len(value))
         return value
 

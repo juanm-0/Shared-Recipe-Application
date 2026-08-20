@@ -96,7 +96,6 @@ REST_FRAMEWORK = {
     ],
     "EXCEPTION_HANDLER": "config.exception_handlers.custom_exception_handler",
     "DEFAULT_PAGINATION_CLASS": "config.pagination.StandardPageNumberPagination",
-    "PAGE_SIZE": 20,
 }
 
 CSRF_COOKIE_HTTPONLY = False

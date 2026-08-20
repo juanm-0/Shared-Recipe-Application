@@ -1,7 +1,7 @@
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import Http404
-from rest_framework.exceptions import NotAuthenticated, ValidationError
+from rest_framework.exceptions import APIException, NotAuthenticated, ValidationError
 
 from config.exception_handlers import custom_exception_handler
 
@@ -41,9 +41,6 @@ def test_django_permission_denied_reshaped():
     response = custom_exception_handler(DjangoPermissionDenied(), {})
     assert response.status_code == 403
     assert response.data["code"] == "permission_denied"
-
-
-from rest_framework.exceptions import APIException
 
 
 def test_extra_context_is_merged_into_response_body():
