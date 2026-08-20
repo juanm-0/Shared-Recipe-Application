@@ -2,7 +2,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 
-from recipes.models import Ingredient, Tag, Recipe
+from recipes.models import Ingredient, Tag, Recipe, Review
 
 pytestmark = pytest.mark.django_db
 
@@ -177,3 +177,29 @@ def test_recipe_cannot_have_same_tag_twice():
     with pytest.raises(IntegrityError):
         with transaction.atomic():
             RecipeTag.objects.create(recipe=recipe, tag=tag, order=2)
+
+
+def test_user_cannot_review_same_recipe_twice():
+    recipe = _make_recipe("chef-review-1")
+    reviewer = User.objects.create_user(username="reviewer1", password="pw12345")
+    Review.objects.create(recipe=recipe, user=reviewer, rating=4, comment="Good")
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            Review.objects.create(recipe=recipe, user=reviewer, rating=5, comment="Great")
+
+
+def test_different_users_can_each_review_same_recipe():
+    recipe = _make_recipe("chef-review-2")
+    reviewer_a = User.objects.create_user(username="reviewer2", password="pw12345")
+    reviewer_b = User.objects.create_user(username="reviewer3", password="pw12345")
+    Review.objects.create(recipe=recipe, user=reviewer_a, rating=3, comment="Ok")
+    Review.objects.create(recipe=recipe, user=reviewer_b, rating=5, comment="Loved it")
+    assert Review.objects.filter(recipe=recipe).count() == 2
+
+
+def test_review_rating_must_be_between_one_and_five():
+    recipe = _make_recipe("chef-review-3")
+    reviewer = User.objects.create_user(username="reviewer4", password="pw12345")
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            Review.objects.create(recipe=recipe, user=reviewer, rating=6, comment="Too high")
