@@ -1,6 +1,9 @@
+from django.db import transaction
 from rest_framework import serializers
 from accounts.permissions import is_owner_or_staff
-from .models import Ingredient, Recipe, RecipeIngredient, Review, Tag
+from .exceptions import TagLimitExceeded
+from .models import Ingredient, Recipe, RecipeIngredient, RecipeTag, Review, Tag
+from .utils import get_or_create_ci
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -71,3 +74,66 @@ class RecipeDetailSerializer(serializers.ModelSerializer):
         if request is None or not request.user.is_authenticated:
             return False
         return is_owner_or_staff(request.user, obj)
+
+
+class RecipeIngredientWriteSerializer(serializers.Serializer):
+    ingredient_name = serializers.CharField(max_length=200)
+    amount = serializers.DecimalField(max_digits=8, decimal_places=2)
+    unit = serializers.ChoiceField(choices=RecipeIngredient.UNIT_CHOICES)
+
+
+class RecipeWriteSerializer(serializers.ModelSerializer):
+    ingredients = RecipeIngredientWriteSerializer(many=True)
+    tags = serializers.ListField(child=serializers.CharField(max_length=100), required=False, default=list)
+
+    class Meta:
+        model = Recipe
+        fields = ["name", "steps", "image", "ingredients", "tags"]
+
+    def validate_ingredients(self, value):
+        if not value:
+            raise serializers.ValidationError("A recipe must have at least one ingredient.")
+        return value
+
+    def validate_steps(self, value):
+        if not value:
+            raise serializers.ValidationError("A recipe must have at least one step.")
+        return value
+
+    def validate_tags(self, value):
+        if len(value) > 5:
+            raise TagLimitExceeded(count=len(value))
+        return value
+
+    def create(self, validated_data):
+        ingredients_data = validated_data.pop("ingredients")
+        tags_data = validated_data.pop("tags", [])
+        request = self.context["request"]
+
+        with transaction.atomic():
+            recipe = Recipe.objects.create(owner=request.user, **validated_data)
+            self._set_ingredients(recipe, ingredients_data)
+            self._set_tags(recipe, tags_data)
+        return recipe
+
+    def _set_ingredients(self, recipe, ingredients_data):
+        recipe.recipe_ingredients.all().delete()
+        for order, item in enumerate(ingredients_data):
+            ingredient = get_or_create_ci(Ingredient, item["ingredient_name"])
+            ri = RecipeIngredient(
+                recipe=recipe,
+                ingredient=ingredient,
+                amount=item["amount"],
+                unit=item["unit"],
+                order=order,
+            )
+            ri.full_clean()
+            ri.save()
+
+    def _set_tags(self, recipe, tags_data):
+        recipe.recipe_tags.all().delete()
+        for order, name in enumerate(tags_data):
+            tag = get_or_create_ci(Tag, name)
+            rt = RecipeTag(recipe=recipe, tag=tag, order=order)
+            rt.full_clean()
+            rt.save()

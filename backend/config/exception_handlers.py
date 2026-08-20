@@ -1,10 +1,15 @@
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import Http404
 from rest_framework import exceptions
 from rest_framework.views import exception_handler as drf_exception_handler
 
 
 def custom_exception_handler(exc, context):
+    if isinstance(exc, DjangoValidationError):
+        detail = exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+        exc = exceptions.ValidationError(detail=detail)
+
     response = drf_exception_handler(exc, context)
     if response is None:
         return None

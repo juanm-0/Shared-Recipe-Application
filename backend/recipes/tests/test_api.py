@@ -147,3 +147,90 @@ def test_recipe_detail_not_found_returns_404():
     response = client.get("/api/recipes/999999/")
     assert response.status_code == 404
     assert response.data["code"] == "not_found"
+
+
+def test_recipe_create_happy_path():
+    owner = User.objects.create_user(username="chef8", password="pw12345")
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    payload = {
+        "name": "Pancakes",
+        "steps": ["Mix", "Cook"],
+        "ingredients": [{"ingredient_name": "Flour", "amount": "1.5", "unit": "cup"}],
+        "tags": ["Breakfast", "Quick"],
+    }
+    response = client.post("/api/recipes/", payload, format="json")
+    assert response.status_code == 201
+    assert response.data["name"] == "Pancakes"
+    assert response.data["ingredients"][0]["ingredient_name"] == "Flour"
+    assert [t["name"] for t in response.data["tags"]] == ["Breakfast", "Quick"]
+    assert response.data["can_edit"] is True
+
+
+def test_recipe_create_reuses_existing_tag_case_insensitively():
+    owner = User.objects.create_user(username="chef9", password="pw12345")
+    Tag.objects.create(name="Vegan")
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    payload = {
+        "name": "Salad",
+        "steps": ["Toss"],
+        "ingredients": [{"ingredient_name": "Lettuce", "amount": "1", "unit": "whole"}],
+        "tags": ["vegan"],
+    }
+    response = client.post("/api/recipes/", payload, format="json")
+    assert response.status_code == 201
+    assert Tag.objects.count() == 1
+
+
+def test_recipe_create_rejects_more_than_five_tags():
+    owner = User.objects.create_user(username="chef10", password="pw12345")
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    payload = {
+        "name": "Curry",
+        "steps": ["Simmer"],
+        "ingredients": [{"ingredient_name": "Rice", "amount": "1", "unit": "cup"}],
+        "tags": ["a", "b", "c", "d", "e", "f"],
+    }
+    response = client.post("/api/recipes/", payload, format="json")
+    assert response.status_code == 400
+    assert response.data["code"] == "tag_limit_exceeded"
+
+
+def test_recipe_create_rejects_empty_ingredients():
+    owner = User.objects.create_user(username="chef11", password="pw12345")
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    payload = {"name": "Empty", "steps": ["Do nothing"], "ingredients": []}
+    response = client.post("/api/recipes/", payload, format="json")
+    assert response.status_code == 400
+    assert response.data["code"] == "validation_error"
+
+
+def test_recipe_create_rejects_duplicate_ingredient_in_one_payload():
+    owner = User.objects.create_user(username="chef11b", password="pw12345")
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    payload = {
+        "name": "Double Flour",
+        "steps": ["Mix"],
+        "ingredients": [
+            {"ingredient_name": "Flour11b", "amount": "1", "unit": "cup"},
+            {"ingredient_name": "Flour11b", "amount": "2", "unit": "cup"},
+        ],
+    }
+    response = client.post("/api/recipes/", payload, format="json")
+    assert response.status_code == 400
+    assert response.data["code"] == "validation_error"
+
+
+def test_recipe_create_requires_authentication():
+    client = APIClient()
+    payload = {
+        "name": "Nope",
+        "steps": ["x"],
+        "ingredients": [{"ingredient_name": "x", "amount": "1", "unit": "whole"}],
+    }
+    response = client.post("/api/recipes/", payload, format="json")
+    assert response.status_code == 401

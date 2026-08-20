@@ -1,13 +1,15 @@
 from django.db.models import Avg, Count, Prefetch
-from rest_framework import mixins, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
+from rest_framework.response import Response
 
 from .models import Ingredient, Recipe, RecipeIngredient, RecipeTag, Review, Tag
 from .serializers import (
     IngredientSerializer,
     RecipeDetailSerializer,
     RecipeListSerializer,
+    RecipeWriteSerializer,
     TagSerializer,
 )
 
@@ -36,13 +38,27 @@ SORT_FIELDS = {
 }
 
 
-class RecipeViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+class RecipeViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet,
+):
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_serializer_class(self):
         if self.action == "list":
             return RecipeListSerializer
+        if self.action in ("create", "update", "partial_update"):
+            return RecipeWriteSerializer
         return RecipeDetailSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        recipe = serializer.save()
+        output_serializer = RecipeDetailSerializer(recipe, context=self.get_serializer_context())
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
     def get_queryset(self):
         queryset = Recipe.objects.annotate(

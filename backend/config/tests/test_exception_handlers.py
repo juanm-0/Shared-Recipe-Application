@@ -1,4 +1,5 @@
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import Http404
 from rest_framework.exceptions import NotAuthenticated, ValidationError
 
@@ -64,3 +65,18 @@ def test_extra_context_is_merged_into_response_body():
 def test_exception_without_extra_context_is_unaffected():
     response = custom_exception_handler(NotAuthenticated(), {})
     assert "current" not in response.data
+
+
+def test_django_validation_error_with_message_dict_reshaped():
+    exc = DjangoValidationError({"amount": "Must be greater than zero."})
+    response = custom_exception_handler(exc, {})
+    assert response.status_code == 400
+    assert response.data["code"] == "validation_error"
+    assert response.data["errors"]["amount"] == ["Must be greater than zero."]
+
+
+def test_django_validation_error_with_plain_message_reshaped():
+    exc = DjangoValidationError("Something is wrong.")
+    response = custom_exception_handler(exc, {})
+    assert response.status_code == 400
+    assert response.data["code"] == "validation_error"
