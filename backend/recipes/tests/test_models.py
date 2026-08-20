@@ -73,3 +73,63 @@ def test_original_owner_cleared_when_original_owner_account_deleted():
     copy.refresh_from_db()
 
     assert copy.original_owner is None
+
+
+from decimal import Decimal
+
+from django.core.exceptions import ValidationError
+
+from recipes.models import RecipeIngredient
+
+
+def _make_recipe(username="chef"):
+    owner = User.objects.create_user(username=username, password="pw12345")
+    return Recipe.objects.create(name="Pancakes", steps=["Mix", "Cook"], owner=owner)
+
+
+def test_recipe_ingredient_amount_must_be_positive():
+    recipe = _make_recipe("chef-amount")
+    flour = Ingredient.objects.create(name="Flour A")
+    line = RecipeIngredient(
+        recipe=recipe, ingredient=flour, amount=Decimal("0"), unit="cup", order=1
+    )
+    with pytest.raises(ValidationError):
+        line.full_clean()
+
+
+def test_recipe_ingredient_accepts_positive_amount():
+    recipe = _make_recipe("chef-positive")
+    flour = Ingredient.objects.create(name="Flour B")
+    line = RecipeIngredient(
+        recipe=recipe, ingredient=flour, amount=Decimal("1.5"), unit="cup", order=1
+    )
+    line.full_clean()
+    line.save()
+    assert RecipeIngredient.objects.count() == 1
+
+
+def test_recipe_ingredient_order_is_unique_per_recipe():
+    recipe = _make_recipe("chef-order")
+    flour = Ingredient.objects.create(name="Flour C")
+    sugar = Ingredient.objects.create(name="Sugar C")
+    RecipeIngredient.objects.create(
+        recipe=recipe, ingredient=flour, amount=Decimal("1"), unit="cup", order=1
+    )
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            RecipeIngredient.objects.create(
+                recipe=recipe, ingredient=sugar, amount=Decimal("1"), unit="cup", order=1
+            )
+
+
+def test_recipe_ingredient_cannot_reference_same_ingredient_twice():
+    recipe = _make_recipe("chef-dup")
+    flour = Ingredient.objects.create(name="Flour D")
+    RecipeIngredient.objects.create(
+        recipe=recipe, ingredient=flour, amount=Decimal("1"), unit="cup", order=1
+    )
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            RecipeIngredient.objects.create(
+                recipe=recipe, ingredient=flour, amount=Decimal("2"), unit="tbsp", order=2
+            )
