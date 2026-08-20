@@ -101,3 +101,30 @@ class RecipeIngredient(models.Model):
 
     def __str__(self):
         return f"{self.amount} {self.unit} {self.ingredient}"
+
+
+class RecipeTag(models.Model):
+    recipe = models.ForeignKey(
+        Recipe, on_delete=models.CASCADE, related_name="recipe_tags"
+    )
+    tag = models.ForeignKey(Tag, on_delete=models.PROTECT, related_name="recipe_tags")
+    order = models.PositiveIntegerField()
+
+    class Meta:
+        unique_together = [
+            ("recipe", "order"),
+            ("recipe", "tag"),
+        ]
+        ordering = ["order"]
+
+    def clean(self):
+        existing_count = (
+            RecipeTag.objects.filter(recipe=self.recipe).exclude(pk=self.pk).count()
+        )
+        if existing_count >= 5:
+            raise ValidationError(
+                f"Recipe already has the maximum of 5 tags (currently {existing_count})."
+            )
+
+    def __str__(self):
+        return f"{self.recipe} - {self.tag}"

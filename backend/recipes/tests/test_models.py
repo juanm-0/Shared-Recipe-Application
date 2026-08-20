@@ -133,3 +133,47 @@ def test_recipe_ingredient_cannot_reference_same_ingredient_twice():
             RecipeIngredient.objects.create(
                 recipe=recipe, ingredient=flour, amount=Decimal("2"), unit="tbsp", order=2
             )
+
+
+from recipes.models import RecipeTag
+
+
+def test_recipe_rejects_sixth_tag():
+    recipe = _make_recipe("chef-sixth-tag")
+    for i in range(5):
+        tag = Tag.objects.create(name=f"tag-{i}")
+        RecipeTag.objects.create(recipe=recipe, tag=tag, order=i)
+
+    sixth_tag = Tag.objects.create(name="tag-5")
+    sixth = RecipeTag(recipe=recipe, tag=sixth_tag, order=5)
+    with pytest.raises(ValidationError):
+        sixth.full_clean()
+
+
+def test_recipe_accepts_up_to_five_tags():
+    recipe = _make_recipe("chef-five-tags")
+    for i in range(5):
+        tag = Tag.objects.create(name=f"tag-ok-{i}")
+        rt = RecipeTag(recipe=recipe, tag=tag, order=i)
+        rt.full_clean()
+        rt.save()
+    assert RecipeTag.objects.filter(recipe=recipe).count() == 5
+
+
+def test_recipe_tag_order_is_unique_per_recipe():
+    recipe = _make_recipe("chef-tag-order")
+    tag_a = Tag.objects.create(name="tag-a")
+    tag_b = Tag.objects.create(name="tag-b")
+    RecipeTag.objects.create(recipe=recipe, tag=tag_a, order=1)
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            RecipeTag.objects.create(recipe=recipe, tag=tag_b, order=1)
+
+
+def test_recipe_cannot_have_same_tag_twice():
+    recipe = _make_recipe("chef-tag-dup")
+    tag = Tag.objects.create(name="tag-dup")
+    RecipeTag.objects.create(recipe=recipe, tag=tag, order=1)
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            RecipeTag.objects.create(recipe=recipe, tag=tag, order=2)
