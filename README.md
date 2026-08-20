@@ -43,6 +43,18 @@ Should start containers for:
 Use self-documenting API via DRF
 Additional details in this README.md
 
+### Error Codes
+
+The following error codes are returned in the API response body and will grow as later sub-projects add their own (e.g., `stale_write`, `duplicate_review`, `tag_limit_exceeded`, etc.):
+
+| Code | HTTP Status | Meaning |
+|---|---|---|
+| `not_authenticated` | 401 | No valid session. Call `/api/auth/login/` first |
+| `authentication_failed` | 401 | Login credentials were wrong (doesn't say which field) |
+| `permission_denied` | 403 | Authenticated, but not the owner/staff |
+| `not_found` | 404 | Resource doesn't exist (or exists but isn't yours) |
+| `validation_error` | 400 | Field-level validation failed — see the `errors` object in the response body |
+
 ## Design Decisions
 
 ### Django layering vs Repository Pattern
@@ -130,3 +142,4 @@ Related to the above Out of Scope items:
 - Unit conversion aware for shopping list merging of items. Per ingredient density data would be necessary (a cup of flour's weight vs a cup of sugar) to tackle this feature
 - Fuzzy catalog deduplication would be beneficial for any duplicate tags or ingredients
 - SSR as mentioned would be useful if discoverability is needed by the application
+- Login and register are not rate-limited. A production deployment would add DRF throttling (`AnonRateThrottle`) to both endpoints to handle any brute-force/credential-stuffing attempts
