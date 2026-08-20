@@ -54,12 +54,13 @@ class RecipeDetailSerializer(serializers.ModelSerializer):
     reviews = ReviewReadSerializer(many=True, read_only=True)
     owner = serializers.CharField(source="owner.username", read_only=True)
     original_recipe = serializers.PrimaryKeyRelatedField(read_only=True)
+    original_owner = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
 
     class Meta:
         model = Recipe
         fields = [
-            "id", "name", "steps", "image", "owner", "original_recipe",
+            "id", "name", "steps", "image", "owner", "original_recipe", "original_owner",
             "ingredients", "tags", "reviews", "can_edit",
             "created_at", "updated_at",
         ]
@@ -74,6 +75,11 @@ class RecipeDetailSerializer(serializers.ModelSerializer):
         if request is None or not request.user.is_authenticated:
             return False
         return is_owner_or_staff(request.user, obj)
+
+    def get_original_owner(self, obj):
+        if obj.original_owner is None:
+            return None
+        return obj.original_owner.username
 
 
 class RecipeIngredientWriteSerializer(serializers.Serializer):

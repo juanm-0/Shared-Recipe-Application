@@ -369,3 +369,31 @@ def test_recipe_delete_rejects_non_owner():
     response = client.delete(f"/api/recipes/{recipe.id}/")
     assert response.status_code == 403
     assert Recipe.objects.filter(id=recipe.id).exists()
+
+
+def test_recipe_detail_exposes_original_owner_when_set():
+    owner = User.objects.create_user(username="chefOrigOwner1", password="pw12345")
+    copier = User.objects.create_user(username="copierOrigOwner1", password="pw12345")
+    original = Recipe.objects.create(name="Original1", steps=["Step"], owner=owner)
+    copy = Recipe.objects.create(
+        name="Original1",
+        steps=["Step"],
+        owner=copier,
+        original_recipe=original,
+        original_owner=owner,
+    )
+
+    client = APIClient()
+    response = client.get(f"/api/recipes/{copy.id}/")
+    assert response.status_code == 200
+    assert response.data["original_owner"] == "chefOrigOwner1"
+
+
+def test_recipe_detail_original_owner_is_null_when_not_a_copy():
+    owner = User.objects.create_user(username="chefOrigOwner2", password="pw12345")
+    recipe = Recipe.objects.create(name="Plain", steps=["Step"], owner=owner)
+
+    client = APIClient()
+    response = client.get(f"/api/recipes/{recipe.id}/")
+    assert response.status_code == 200
+    assert response.data["original_owner"] is None
