@@ -1,4 +1,4 @@
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from rest_framework import serializers
 from accounts.permissions import is_owner_or_staff
 from .exceptions import DuplicateReview, StaleWrite, TagLimitExceeded
@@ -185,14 +185,21 @@ class ReviewWriteSerializer(serializers.Serializer):
         return attrs
 
     def create(self, validated_data):
-        return Review.objects.create(
-            recipe=self.context["recipe"],
-            user=self.context["request"].user,
-            **validated_data,
-        )
+        recipe = self.context["recipe"]
+        user = self.context["request"].user
+        review = Review(recipe=recipe, user=user, **validated_data)
+        review.full_clean(validate_unique=False)
+        try:
+            with transaction.atomic():
+                review.save()
+        except IntegrityError:
+            existing = Review.objects.get(recipe=recipe, user=user)
+            raise DuplicateReview(review_id=existing.id)
+        return review
 
     def update(self, instance, validated_data):
         instance.rating = validated_data.get("rating", instance.rating)
         instance.comment = validated_data.get("comment", instance.comment)
+        instance.full_clean(validate_unique=False)
         instance.save()
         return instance

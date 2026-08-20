@@ -27,13 +27,13 @@ class ReviewCreateView(APIView):
 class ReviewDetailView(APIView):
     permission_classes = [IsAuthenticated, IsOwnerOrStaff]
 
-    def get_object(self, recipe_id, review_id):
+    def _get_review(self, recipe_id, review_id):
         review = get_object_or_404(Review, pk=review_id, recipe_id=recipe_id)
         self.check_object_permissions(self.request, review)
         return review
 
     def patch(self, request, recipe_id, review_id):
-        review = self.get_object(recipe_id, review_id)
+        review = self._get_review(recipe_id, review_id)
         serializer = ReviewWriteSerializer(
             review, data=request.data, partial=True, context={"request": request, "recipe": review.recipe}
         )
@@ -43,6 +43,6 @@ class ReviewDetailView(APIView):
         return Response(output_serializer.data, status=status.HTTP_200_OK)
 
     def delete(self, request, recipe_id, review_id):
-        review = self.get_object(recipe_id, review_id)
+        review = self._get_review(recipe_id, review_id)
         review.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

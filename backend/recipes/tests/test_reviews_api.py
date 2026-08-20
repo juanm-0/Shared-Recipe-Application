@@ -151,3 +151,90 @@ def test_staff_can_update_any_review():
         f"/api/recipes/{recipe.id}/reviews/{review.id}/", {"rating": 1}, format="json"
     )
     assert response.status_code == 200
+
+
+def test_review_detail_404_when_review_belongs_to_other_recipe():
+    owner1 = User.objects.create_user(username="chefA", password="pw12345")
+    owner2 = User.objects.create_user(username="chefB", password="pw12345")
+    reviewer = User.objects.create_user(username="reviewerX", password="pw12345")
+    recipe_a = _make_recipe(owner1, name="Recipe A")
+    recipe_b = _make_recipe(owner2, name="Recipe B")
+    review = Review.objects.create(recipe=recipe_a, user=reviewer, rating=3, comment="On A")
+
+    client = APIClient()
+    client.force_authenticate(user=reviewer)
+
+    patch_response = client.patch(
+        f"/api/recipes/{recipe_b.id}/reviews/{review.id}/", {"rating": 5}, format="json"
+    )
+    assert patch_response.status_code == 404
+
+    delete_response = client.delete(f"/api/recipes/{recipe_b.id}/reviews/{review.id}/")
+    assert delete_response.status_code == 404
+
+    review.refresh_from_db()
+    assert review.rating == 3
+
+
+def test_review_appears_in_recipe_detail_after_create_and_disappears_after_delete():
+    owner = User.objects.create_user(username="chefDetail", password="pw12345")
+    reviewer = User.objects.create_user(username="reviewerDetail", password="pw12345")
+    recipe = _make_recipe(owner)
+
+    client = APIClient()
+    client.force_authenticate(user=reviewer)
+
+    create_response = client.post(
+        f"/api/recipes/{recipe.id}/reviews/", {"rating": 4, "comment": "Nice"}, format="json"
+    )
+    review_id = create_response.data["id"]
+
+    detail_response = client.get(f"/api/recipes/{recipe.id}/")
+    review_ids = [r["id"] for r in detail_response.data["reviews"]]
+    assert review_id in review_ids
+
+    client.delete(f"/api/recipes/{recipe.id}/reviews/{review_id}/")
+
+    detail_response_after = client.get(f"/api/recipes/{recipe.id}/")
+    review_ids_after = [r["id"] for r in detail_response_after.data["reviews"]]
+    assert review_id not in review_ids_after
+
+
+def test_review_update_rejects_rating_out_of_range():
+    owner = User.objects.create_user(username="chefUpdRange", password="pw12345")
+    reviewer = User.objects.create_user(username="reviewerUpdRange", password="pw12345")
+    recipe = _make_recipe(owner)
+    review = Review.objects.create(recipe=recipe, user=reviewer, rating=3, comment="Ok")
+
+    client = APIClient()
+    client.force_authenticate(user=reviewer)
+    response = client.patch(
+        f"/api/recipes/{recipe.id}/reviews/{review.id}/", {"rating": 7}, format="json"
+    )
+    assert response.status_code == 400
+    review.refresh_from_db()
+    assert review.rating == 3
+
+
+def test_review_update_requires_authentication():
+    owner = User.objects.create_user(username="chefAuthUpd", password="pw12345")
+    reviewer = User.objects.create_user(username="reviewerAuthUpd", password="pw12345")
+    recipe = _make_recipe(owner)
+    review = Review.objects.create(recipe=recipe, user=reviewer, rating=3, comment="Ok")
+
+    client = APIClient()
+    response = client.patch(
+        f"/api/recipes/{recipe.id}/reviews/{review.id}/", {"rating": 5}, format="json"
+    )
+    assert response.status_code == 401
+
+
+def test_review_delete_requires_authentication():
+    owner = User.objects.create_user(username="chefAuthDel", password="pw12345")
+    reviewer = User.objects.create_user(username="reviewerAuthDel", password="pw12345")
+    recipe = _make_recipe(owner)
+    review = Review.objects.create(recipe=recipe, user=reviewer, rating=3, comment="Ok")
+
+    client = APIClient()
+    response = client.delete(f"/api/recipes/{recipe.id}/reviews/{review.id}/")
+    assert response.status_code == 401
