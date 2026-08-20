@@ -3,8 +3,13 @@ from rest_framework import mixins, viewsets
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
 
-from .models import Ingredient, Recipe, RecipeTag, Tag
-from .serializers import IngredientSerializer, RecipeListSerializer, TagSerializer
+from .models import Ingredient, Recipe, RecipeIngredient, RecipeTag, Review, Tag
+from .serializers import (
+    IngredientSerializer,
+    RecipeDetailSerializer,
+    RecipeListSerializer,
+    TagSerializer,
+)
 
 
 class TagListView(ListAPIView):
@@ -31,22 +36,39 @@ SORT_FIELDS = {
 }
 
 
-class RecipeViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+class RecipeViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_serializer_class(self):
-        return RecipeListSerializer
+        if self.action == "list":
+            return RecipeListSerializer
+        return RecipeDetailSerializer
 
     def get_queryset(self):
         queryset = Recipe.objects.annotate(
             average_rating=Avg("reviews__rating"),
             review_count=Count("reviews", distinct=True),
-        ).prefetch_related(
-            Prefetch(
-                "recipe_tags",
-                queryset=RecipeTag.objects.select_related("tag").order_by("order"),
-            )
         )
+
+        if self.action == "list":
+            queryset = queryset.prefetch_related(
+                Prefetch(
+                    "recipe_tags",
+                    queryset=RecipeTag.objects.select_related("tag").order_by("order"),
+                )
+            )
+        else:
+            queryset = queryset.select_related("owner", "original_recipe").prefetch_related(
+                Prefetch(
+                    "recipe_tags",
+                    queryset=RecipeTag.objects.select_related("tag").order_by("order"),
+                ),
+                Prefetch(
+                    "recipe_ingredients",
+                    queryset=RecipeIngredient.objects.select_related("ingredient").order_by("order"),
+                ),
+                Prefetch("reviews", queryset=Review.objects.select_related("user")),
+            )
 
         params = self.request.query_params
 

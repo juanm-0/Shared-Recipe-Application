@@ -1,7 +1,9 @@
+from decimal import Decimal
+
 import pytest
 from rest_framework.test import APIClient
 
-from recipes.models import Ingredient, Tag
+from recipes.models import Ingredient, RecipeIngredient, Tag
 
 pytestmark = pytest.mark.django_db
 
@@ -107,3 +109,41 @@ def test_recipe_list_query_count_stays_flat_as_dataset_grows():
     assert response.status_code == 200
     assert response.data["count"] == 11
     assert len(many_recipe_queries.captured_queries) == len(one_recipe_queries.captured_queries)
+
+
+def test_recipe_detail_returns_full_payload():
+    owner = User.objects.create_user(username="chef6", password="pw12345")
+    flour = Ingredient.objects.create(name="Flour6")
+    tag = Tag.objects.create(name="Tag6")
+    recipe = Recipe.objects.create(name="Bread", steps=["Mix", "Bake"], owner=owner)
+    RecipeIngredient.objects.create(
+        recipe=recipe, ingredient=flour, amount=Decimal("2"), unit="cup", order=1
+    )
+    RecipeTag.objects.create(recipe=recipe, tag=tag, order=1)
+
+    client = APIClient()
+    response = client.get(f"/api/recipes/{recipe.id}/")
+    assert response.status_code == 200
+    assert response.data["name"] == "Bread"
+    assert response.data["ingredients"][0]["ingredient_name"] == "Flour6"
+    assert response.data["tags"][0]["name"] == "Tag6"
+    assert response.data["owner"] == "chef6"
+    assert response.data["can_edit"] is False
+
+
+def test_recipe_detail_can_edit_true_for_owner():
+    owner = User.objects.create_user(username="chef7", password="pw12345")
+    recipe = Recipe.objects.create(name="Soup", steps=["Boil"], owner=owner)
+
+    client = APIClient()
+    client.force_authenticate(user=owner)
+    response = client.get(f"/api/recipes/{recipe.id}/")
+    assert response.status_code == 200
+    assert response.data["can_edit"] is True
+
+
+def test_recipe_detail_not_found_returns_404():
+    client = APIClient()
+    response = client.get("/api/recipes/999999/")
+    assert response.status_code == 404
+    assert response.data["code"] == "not_found"
