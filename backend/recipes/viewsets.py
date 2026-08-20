@@ -57,19 +57,23 @@ SORT_FIELDS = {
     "-created_at": "-created_at",
 }
 
+UPDATE_ACTIONS = ("update", "partial_update")
+OWNER_ONLY_ACTIONS = UPDATE_ACTIONS + ("destroy",)
+WRITE_SERIALIZER_ACTIONS = ("create",) + UPDATE_ACTIONS
+
 
 class RecipeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_permissions(self):
-        if self.action in ("update", "partial_update", "destroy"):
+        if self.action in OWNER_ONLY_ACTIONS:
             return [IsAuthenticatedOrReadOnly(), IsOwnerOrStaff()]
         return [permission() for permission in self.permission_classes]
 
     def get_serializer_class(self):
         if self.action == "list":
             return RecipeListSerializer
-        if self.action in ("create", "update", "partial_update"):
+        if self.action in WRITE_SERIALIZER_ACTIONS:
             return RecipeWriteSerializer
         return RecipeDetailSerializer
 
