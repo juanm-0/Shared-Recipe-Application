@@ -1,3 +1,6 @@
+from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.http import Http404
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.views import exception_handler as drf_exception_handler
 
 
@@ -6,9 +9,14 @@ def custom_exception_handler(exc, context):
     if response is None:
         return None
 
+    if isinstance(exc, Http404):
+        exc = NotFound(*exc.args)
+    elif isinstance(exc, DjangoPermissionDenied):
+        exc = PermissionDenied(*exc.args)
+
     codes = exc.get_codes()
 
-    if isinstance(codes, dict):
+    if isinstance(exc, ValidationError):
         response.data = {
             "detail": "Validation failed.",
             "code": "validation_error",

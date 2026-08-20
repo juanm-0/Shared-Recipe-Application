@@ -69,3 +69,15 @@ def test_csrf_endpoint_sets_cookie():
     response = client.get("/api/auth/csrf/")
     assert response.status_code == 200
     assert "csrftoken" in response.cookies
+
+
+def test_login_requires_csrf_token_for_real_browser_requests():
+    from rest_framework.test import APIClient
+
+    User.objects.create_user(username="chef5", password="a-strong-password-1")
+    strict_client = APIClient(enforce_csrf_checks=True)
+    strict_client.get("/api/auth/csrf/")  # sets the cookie but we deliberately don't echo it
+    response = strict_client.post(
+        "/api/auth/login/", {"username": "chef5", "password": "a-strong-password-1"}, format="json"
+    )
+    assert response.status_code == 403

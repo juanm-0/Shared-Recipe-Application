@@ -1,6 +1,6 @@
 from django.contrib.auth import authenticate, login, logout
 from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny
@@ -33,6 +33,7 @@ class RegisterView(APIView):
         return Response(_user_payload(user), status=status.HTTP_201_CREATED)
 
 
+@method_decorator(csrf_protect, name="dispatch")
 class LoginView(APIView):
     permission_classes = [AllowAny]
 

@@ -1,3 +1,5 @@
+from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.http import Http404
 from rest_framework.exceptions import NotAuthenticated, ValidationError
 
 from config.exception_handlers import custom_exception_handler
@@ -26,3 +28,15 @@ def test_non_api_exception_returns_none():
     exc = ValueError("boom")
     response = custom_exception_handler(exc, {})
     assert response is None
+
+
+def test_http404_reshaped_to_not_found():
+    response = custom_exception_handler(Http404(), {})
+    assert response.status_code == 404
+    assert response.data["code"] == "not_found"
+
+
+def test_django_permission_denied_reshaped():
+    response = custom_exception_handler(DjangoPermissionDenied(), {})
+    assert response.status_code == 403
+    assert response.data["code"] == "permission_denied"
