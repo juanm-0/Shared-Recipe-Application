@@ -1,7 +1,7 @@
 from django.db import transaction
 from rest_framework import serializers
 from accounts.permissions import is_owner_or_staff
-from .exceptions import StaleWrite, TagLimitExceeded
+from .exceptions import DuplicateReview, StaleWrite, TagLimitExceeded
 from .models import Ingredient, Recipe, RecipeIngredient, RecipeTag, Review, Tag
 from .utils import get_or_create_ci
 
@@ -169,3 +169,24 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
             rt = RecipeTag(recipe=recipe, tag=tag, order=order)
             rt.full_clean()
             rt.save()
+
+
+class ReviewWriteSerializer(serializers.Serializer):
+    rating = serializers.IntegerField(min_value=1, max_value=5)
+    comment = serializers.CharField(allow_blank=True, required=False, default="")
+
+    def validate(self, attrs):
+        if self.instance is None:
+            recipe = self.context["recipe"]
+            user = self.context["request"].user
+            existing = Review.objects.filter(recipe=recipe, user=user).first()
+            if existing is not None:
+                raise DuplicateReview(review_id=existing.id)
+        return attrs
+
+    def create(self, validated_data):
+        return Review.objects.create(
+            recipe=self.context["recipe"],
+            user=self.context["request"].user,
+            **validated_data,
+        )
