@@ -40,3 +40,27 @@ def test_django_permission_denied_reshaped():
     response = custom_exception_handler(DjangoPermissionDenied(), {})
     assert response.status_code == 403
     assert response.data["code"] == "permission_denied"
+
+
+from rest_framework.exceptions import APIException
+
+
+def test_extra_context_is_merged_into_response_body():
+    class _WithContext(APIException):
+        status_code = 409
+        default_detail = "Conflict."
+        default_code = "test_conflict"
+
+        def __init__(self):
+            super().__init__()
+            self.extra_context = {"current": {"id": 1}}
+
+    response = custom_exception_handler(_WithContext(), {})
+    assert response.status_code == 409
+    assert response.data["code"] == "test_conflict"
+    assert response.data["current"] == {"id": 1}
+
+
+def test_exception_without_extra_context_is_unaffected():
+    response = custom_exception_handler(NotAuthenticated(), {})
+    assert "current" not in response.data
