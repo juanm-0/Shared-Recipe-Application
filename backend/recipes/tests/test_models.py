@@ -1,8 +1,12 @@
+from decimal import Decimal
+
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import ProtectedError
 
-from recipes.models import Ingredient, Tag, Recipe, Review
+from recipes.models import Ingredient, Recipe, RecipeIngredient, RecipeTag, Review, Tag
 
 pytestmark = pytest.mark.django_db
 
@@ -75,13 +79,6 @@ def test_original_owner_cleared_when_original_owner_account_deleted():
     assert copy.original_owner is None
 
 
-from decimal import Decimal
-
-from django.core.exceptions import ValidationError
-
-from recipes.models import RecipeIngredient
-
-
 def _make_recipe(username="chef"):
     owner = User.objects.create_user(username=username, password="pw12345")
     return Recipe.objects.create(name="Pancakes", steps=["Mix", "Cook"], owner=owner)
@@ -133,9 +130,6 @@ def test_recipe_ingredient_cannot_reference_same_ingredient_twice():
             RecipeIngredient.objects.create(
                 recipe=recipe, ingredient=flour, amount=Decimal("2"), unit="tbsp", order=2
             )
-
-
-from recipes.models import RecipeTag
 
 
 def test_recipe_rejects_sixth_tag():
@@ -203,3 +197,29 @@ def test_review_rating_must_be_between_one_and_five():
     with pytest.raises(IntegrityError):
         with transaction.atomic():
             Review.objects.create(recipe=recipe, user=reviewer, rating=6, comment="Too high")
+
+
+def test_review_rating_full_clean_rejects_out_of_range_value():
+    recipe = _make_recipe("chef-review-clean")
+    reviewer = User.objects.create_user(username="reviewer5", password="pw12345")
+    review = Review(recipe=recipe, user=reviewer, rating=6, comment="Too high")
+    with pytest.raises(ValidationError):
+        review.full_clean()
+
+
+def test_deleting_ingredient_used_by_recipe_is_protected():
+    recipe = _make_recipe("chef-protect-ing")
+    flour = Ingredient.objects.create(name="Flour Protected R")
+    RecipeIngredient.objects.create(
+        recipe=recipe, ingredient=flour, amount=Decimal("1"), unit="cup", order=1
+    )
+    with pytest.raises(ProtectedError):
+        flour.delete()
+
+
+def test_deleting_tag_used_by_recipe_is_protected():
+    recipe = _make_recipe("chef-protect-tag")
+    vegan_tag = Tag.objects.create(name="tag-protected")
+    RecipeTag.objects.create(recipe=recipe, tag=vegan_tag, order=1)
+    with pytest.raises(ProtectedError):
+        vegan_tag.delete()

@@ -2,6 +2,7 @@ from decimal import Decimal
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
 
@@ -36,3 +37,14 @@ def test_deleting_unused_ingredient_succeeds():
     flour = Ingredient.objects.create(name="Unused Flour")
     flour.delete()
     assert not Ingredient.objects.filter(name="Unused Flour").exists()
+
+
+def test_shopping_list_item_amount_must_be_positive():
+    user = User.objects.create_user(username="lister3", password="pw12345")
+    shopping_list = ShoppingList.objects.create(user=user)
+    flour = Ingredient.objects.create(name="Flour Zero Amount")
+    item = ShoppingListItem(
+        shopping_list=shopping_list, ingredient=flour, amount=Decimal("0"), unit="cup"
+    )
+    with pytest.raises(ValidationError):
+        item.full_clean()

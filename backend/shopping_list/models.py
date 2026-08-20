@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from recipes.models import Ingredient, Recipe, RecipeIngredient
@@ -34,9 +35,13 @@ class ShoppingListItem(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                check=models.Q(amount__gt=0), name="shoppinglistitem_amount_gt_0"
+                condition=models.Q(amount__gt=0), name="shoppinglistitem_amount_gt_0"
             ),
         ]
+
+    def clean(self):
+        if self.amount is not None and self.amount <= 0:
+            raise ValidationError({"amount": "Amount must be greater than zero."})
 
     def __str__(self):
         return f"{self.amount} {self.unit} {self.ingredient}"

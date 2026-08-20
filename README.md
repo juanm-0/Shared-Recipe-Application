@@ -20,6 +20,13 @@ Built on a Django + PostgreSQL backend, React + Typescript frontend
 ## Quick Start
 
 Requires Docker and Docker Compose
+
+```
+cp .env.example .env
+docker compose up --build
+docker compose exec backend python manage.py migrate
+```
+
 Should start containers for:
 - database: PostgreSQL
 - backend: Django

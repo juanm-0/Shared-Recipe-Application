@@ -86,7 +86,7 @@ class RecipeIngredient(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                check=models.Q(amount__gt=0), name="recipeingredient_amount_gt_0"
+                condition=models.Q(amount__gt=0), name="recipeingredient_amount_gt_0"
             ),
         ]
         unique_together = [
@@ -145,11 +145,15 @@ class Review(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                check=models.Q(rating__gte=1) & models.Q(rating__lte=5),
+                condition=models.Q(rating__gte=1) & models.Q(rating__lte=5),
                 name="review_rating_between_1_and_5",
             ),
         ]
         unique_together = [("recipe", "user")]
+
+    def clean(self):
+        if self.rating is not None and not (1 <= self.rating <= 5):
+            raise ValidationError({"rating": "Rating must be between 1 and 5."})
 
     def __str__(self):
         return f"{self.user} - {self.recipe} ({self.rating})"
