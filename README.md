@@ -34,9 +34,14 @@ Should start containers for:
 
 ## Seeding Data
 
+```
+docker compose exec backend python manage.py seed_data
+```
+
 - Default of 15 users, 40 recipes
-- Allow for generation of larger data
-- Allow to clear seed data
+- `--users=N` / `--recipes=N` to generate larger (or smaller) data sets. `--recipes` alone (with `--users=0`) adds recipes against the existing seeded users rather than requiring new ones.
+- `--clear` deletes existing seed data (non-staff users and everything of theirs) and unreferenced catalog rows before reseeding — staff/superuser accounts, and anything they own, are preserved
+- All seeded users share one password, `seedpass123`, printed on completion
 
 ## API Reference
 

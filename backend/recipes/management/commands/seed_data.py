@@ -1,3 +1,4 @@
+import argparse
 import random
 from decimal import Decimal
 
@@ -9,7 +10,8 @@ from faker import Faker
 
 from recipes.models import Ingredient, Recipe, RecipeIngredient, RecipeTag, Review, Tag
 from recipes.utils import get_or_create_ci
-from shopping_list.services import get_or_create_shopping_list, import_recipe_into_shopping_list, merge_or_create_item
+from shopping_list.models import ShoppingListItem
+from shopping_list.services import import_recipe_into_shopping_list, merge_or_create_item
 
 User = get_user_model()
 
@@ -36,16 +38,27 @@ TAG_POOL = [
 ]
 
 
+def _non_negative_int(value):
+    ivalue = int(value)
+    if ivalue < 0:
+        raise argparse.ArgumentTypeError(f"{value} must be a non-negative integer.")
+    return ivalue
+
+
 class Command(BaseCommand):
     help = "Seeds the database with fake users, recipes, reviews, and shopping-list data."
 
     def add_arguments(self, parser):
-        parser.add_argument("--users", type=int, default=15, help="Number of users to create (default: 15).")
-        parser.add_argument("--recipes", type=int, default=40, help="Number of recipes to create (default: 40).")
+        parser.add_argument(
+            "--users", type=_non_negative_int, default=15, help="Number of users to create (default: 15)."
+        )
+        parser.add_argument(
+            "--recipes", type=_non_negative_int, default=40, help="Number of recipes to create (default: 40)."
+        )
         parser.add_argument(
             "--clear",
             action="store_true",
-            help="Delete existing seed data (non-staff users and all their data, plus the catalog) before seeding.",
+            help="Delete existing seed data (non-staff users and all their data, plus unreferenced catalog data) before seeding.",
         )
 
     def handle(self, *args, **options):
@@ -57,22 +70,31 @@ class Command(BaseCommand):
 
             self._seed_catalog()
             users = self._seed_users(options["users"], fake)
-            recipes = self._seed_recipes(options["recipes"], users, fake)
-            reviews = self._seed_reviews(recipes, users, fake)
-            self._seed_shopping_lists(users, recipes)
+            available_users = list(users) if users else list(
+                User.objects.filter(is_staff=False, is_superuser=False)
+            )
+            recipes = self._seed_recipes(options["recipes"], available_users, fake)
+            reviews = self._seed_reviews(recipes, available_users, fake)
+            shopping_lists_seeded = self._seed_shopping_lists(available_users, recipes)
 
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"Created {len(users)} users, {len(recipes)} recipes, {len(reviews)} reviews. "
+                    f"Created {len(users)} users, {len(recipes)} recipes, {len(reviews)} reviews, "
+                    f"{shopping_lists_seeded} shopping lists with items. "
                     f"Password for all seeded users: {SEED_PASSWORD}"
                 )
             )
 
     def _clear(self):
-        deleted_users, _ = User.objects.filter(is_staff=False, is_superuser=False).delete()
-        Ingredient.objects.all().delete()
-        Tag.objects.all().delete()
-        self.stdout.write(self.style.WARNING(f"Cleared {deleted_users} non-staff users and all catalog data."))
+        _, per_model = User.objects.filter(is_staff=False, is_superuser=False).delete()
+        user_count = per_model.get("accounts.User", 0)
+        Ingredient.objects.exclude(
+            pk__in=RecipeIngredient.objects.values("ingredient_id")
+        ).exclude(
+            pk__in=ShoppingListItem.objects.values("ingredient_id")
+        ).delete()
+        Tag.objects.exclude(pk__in=RecipeTag.objects.values("tag_id")).delete()
+        self.stdout.write(self.style.WARNING(f"Cleared {user_count} non-staff users and unreferenced catalog data."))
 
     def _seed_catalog(self):
         for name in INGREDIENT_POOL:
@@ -151,15 +173,14 @@ class Command(BaseCommand):
 
     def _seed_shopping_lists(self, users, recipes):
         if not recipes:
-            return
+            return 0
         ingredients = list(Ingredient.objects.all())
         units = [choice[0] for choice in RecipeIngredient.UNIT_CHOICES]
+        seeded_count = 0
         for user in users:
             if random.random() < 0.5:
                 continue
-            import_recipe_into_shopping_list(random.choice(recipes), user)
-
-            shopping_list = get_or_create_shopping_list(user)
+            shopping_list = import_recipe_into_shopping_list(random.choice(recipes), user)
             for _ in range(random.randint(0, 3)):
                 merge_or_create_item(
                     shopping_list,
@@ -167,3 +188,5 @@ class Command(BaseCommand):
                     Decimal(random.randint(50, 500)) / 100,
                     random.choice(units),
                 )
+            seeded_count += 1
+        return seeded_count
