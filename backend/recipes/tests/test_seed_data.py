@@ -1,9 +1,10 @@
 import pytest
+from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password
 from django.core.management import call_command
 
-from recipes.models import Ingredient, Tag
+from recipes.models import Ingredient, Recipe, RecipeTag, Review, Tag
 
 pytestmark = pytest.mark.django_db
 
@@ -57,3 +58,39 @@ def test_running_twice_without_clear_does_not_collide_on_username():
     call_command("seed_data", "--users=5", "--recipes=0")
     call_command("seed_data", "--users=5", "--recipes=0")
     assert User.objects.filter(is_staff=False, is_superuser=False).count() == 10
+
+
+def test_seed_creates_requested_number_of_recipes():
+    call_command("seed_data", "--users=5", "--recipes=10")
+    assert Recipe.objects.count() == 10
+
+
+def test_seeded_recipes_have_at_least_one_ingredient_and_step():
+    call_command("seed_data", "--users=3", "--recipes=5")
+    for recipe in Recipe.objects.all():
+        assert recipe.recipe_ingredients.exists()
+        assert len(recipe.steps) >= 1
+
+
+def test_seeded_recipes_respect_max_tags():
+    call_command("seed_data", "--users=3", "--recipes=20")
+    for recipe in Recipe.objects.all():
+        assert recipe.recipe_tags.count() <= RecipeTag.MAX_TAGS
+
+
+def test_seeded_reviews_never_include_the_recipes_own_owner():
+    call_command("seed_data", "--users=5", "--recipes=20")
+    for review in Review.objects.select_related("recipe"):
+        assert review.user_id != review.recipe.owner_id
+
+
+def test_seeded_reviews_respect_unique_together():
+    call_command("seed_data", "--users=5", "--recipes=20")
+    for recipe in Recipe.objects.all():
+        reviewer_ids = list(recipe.reviews.values_list("user_id", flat=True))
+        assert len(reviewer_ids) == len(set(reviewer_ids))
+
+
+def test_zero_recipes_produces_no_recipes():
+    call_command("seed_data", "--users=5", "--recipes=0")
+    assert Recipe.objects.count() == 0
