@@ -397,3 +397,64 @@ def test_recipe_detail_original_owner_is_null_when_not_a_copy():
     response = client.get(f"/api/recipes/{recipe.id}/")
     assert response.status_code == 200
     assert response.data["original_owner"] is None
+
+
+def test_recipe_copy_happy_path():
+    owner = User.objects.create_user(username="chefCopy1", password="pw12345")
+    copier = User.objects.create_user(username="copierCopy1", password="pw12345")
+    tag = Tag.objects.create(name="TagCopy1")
+    flour = Ingredient.objects.create(name="FlourCopy1")
+    original = Recipe.objects.create(name="Waffles", steps=["Mix", "Cook"], owner=owner)
+    RecipeIngredient.objects.create(
+        recipe=original, ingredient=flour, amount=Decimal("2"), unit="cup", order=0
+    )
+    RecipeTag.objects.create(recipe=original, tag=tag, order=0)
+
+    client = APIClient()
+    client.force_authenticate(user=copier)
+    response = client.post(f"/api/recipes/{original.id}/copy/")
+    assert response.status_code == 201
+    assert response.data["name"] == "Waffles"
+    assert response.data["id"] != original.id
+    assert response.data["original_recipe"] == original.id
+    assert response.data["original_owner"] == "chefCopy1"
+    assert response.data["ingredients"][0]["ingredient_name"] == "FlourCopy1"
+    assert [t["name"] for t in response.data["tags"]] == ["TagCopy1"]
+    assert response.data["reviews"] == []
+
+
+def test_recipe_copy_requires_authentication():
+    owner = User.objects.create_user(username="chefCopy2", password="pw12345")
+    original = Recipe.objects.create(name="Toast", steps=["Toast it"], owner=owner)
+
+    client = APIClient()
+    response = client.post(f"/api/recipes/{original.id}/copy/")
+    assert response.status_code == 401
+
+
+def test_recipe_copy_404_for_nonexistent_recipe():
+    copier = User.objects.create_user(username="copierCopy3", password="pw12345")
+    client = APIClient()
+    client.force_authenticate(user=copier)
+    response = client.post("/api/recipes/999999/copy/")
+    assert response.status_code == 404
+    assert response.data["code"] == "not_found"
+
+
+def test_recipe_copy_survives_deletion_of_original():
+    owner = User.objects.create_user(username="chefCopy4", password="pw12345")
+    copier = User.objects.create_user(username="copierCopy4", password="pw12345")
+    original = Recipe.objects.create(name="Cookies", steps=["Bake"], owner=owner)
+
+    client = APIClient()
+    client.force_authenticate(user=copier)
+    copy_response = client.post(f"/api/recipes/{original.id}/copy/")
+    copy_id = copy_response.data["id"]
+    assert copy_response.data["original_owner"] == "chefCopy4"
+
+    original.delete()
+
+    detail_response = client.get(f"/api/recipes/{copy_id}/")
+    assert detail_response.status_code == 200
+    assert detail_response.data["original_recipe"] is None
+    assert detail_response.data["original_owner"] == "chefCopy4"

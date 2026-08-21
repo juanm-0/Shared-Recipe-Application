@@ -1,5 +1,6 @@
 from django.db.models import Avg, Count, F, Prefetch
 from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
@@ -14,6 +15,7 @@ from .serializers import (
     RecipeWriteSerializer,
     TagSerializer,
 )
+from .services import copy_recipe
 
 
 def _int_param(params, key):
@@ -92,6 +94,13 @@ class RecipeViewSet(viewsets.ModelViewSet):
         recipe = serializer.save()
         output_serializer = RecipeDetailSerializer(recipe, context=self.get_serializer_context())
         return Response(output_serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"])
+    def copy(self, request, pk=None):
+        original_recipe = self.get_object()
+        new_recipe = copy_recipe(original_recipe, request.user)
+        output_serializer = RecipeDetailSerializer(new_recipe, context=self.get_serializer_context())
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
     def get_queryset(self):
         if self.action != "list":
