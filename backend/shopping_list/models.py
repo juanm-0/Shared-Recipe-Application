@@ -33,6 +33,7 @@ class ShoppingListItem(models.Model):
     )
 
     class Meta:
+        ordering = ["id"]
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(amount__gt=0), name="shoppinglistitem_amount_gt_0"
