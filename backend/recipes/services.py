@@ -7,8 +7,8 @@ def copy_recipe(original_recipe, new_owner):
     with transaction.atomic():
         new_recipe = Recipe.objects.create(
             name=original_recipe.name,
-            steps=original_recipe.steps,
-            image=original_recipe.image,
+            steps=list(original_recipe.steps),
+            image=original_recipe.image.name,
             owner=new_owner,
             original_recipe=original_recipe,
             original_owner=original_recipe.owner,

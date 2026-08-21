@@ -458,3 +458,22 @@ def test_recipe_copy_survives_deletion_of_original():
     assert detail_response.status_code == 200
     assert detail_response.data["original_recipe"] is None
     assert detail_response.data["original_owner"] == "chefCopy4"
+
+
+def test_recipe_copy_of_a_copy_points_to_intermediate_copier():
+    root_owner = User.objects.create_user(username="chefCopy5", password="pw12345")
+    first_copier = User.objects.create_user(username="copierCopy5a", password="pw12345")
+    second_copier = User.objects.create_user(username="copierCopy5b", password="pw12345")
+    original = Recipe.objects.create(name="Stew", steps=["Simmer"], owner=root_owner)
+
+    client = APIClient()
+    client.force_authenticate(user=first_copier)
+    first_copy_response = client.post(f"/api/recipes/{original.id}/copy/")
+    first_copy_id = first_copy_response.data["id"]
+
+    client.force_authenticate(user=second_copier)
+    second_copy_response = client.post(f"/api/recipes/{first_copy_id}/copy/")
+
+    assert second_copy_response.status_code == 201
+    assert second_copy_response.data["original_recipe"] == first_copy_id
+    assert second_copy_response.data["original_owner"] == "copierCopy5a"

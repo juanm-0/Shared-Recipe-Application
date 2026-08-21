@@ -108,7 +108,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return self._apply_sort(self._apply_filters(self._list_queryset()))
 
     def _detail_queryset(self):
-        return Recipe.objects.select_related("owner").prefetch_related(
+        return Recipe.objects.select_related("owner", "original_owner").prefetch_related(
             Prefetch(
                 "recipe_tags",
                 queryset=RecipeTag.objects.select_related("tag").order_by("order"),
