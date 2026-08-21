@@ -5,6 +5,7 @@ from django.contrib.auth.hashers import check_password
 from django.core.management import call_command
 
 from recipes.models import Ingredient, Recipe, RecipeTag, Review, Tag
+from shopping_list.models import ShoppingList, ShoppingListItem
 
 pytestmark = pytest.mark.django_db
 
@@ -94,3 +95,19 @@ def test_seeded_reviews_respect_unique_together():
 def test_zero_recipes_produces_no_recipes():
     call_command("seed_data", "--users=5", "--recipes=0")
     assert Recipe.objects.count() == 0
+
+
+def test_some_users_get_shopping_list_items():
+    call_command("seed_data", "--users=10", "--recipes=10")
+    lists_with_items = ShoppingList.objects.filter(items__isnull=False).distinct().count()
+    assert lists_with_items > 0
+
+
+def test_shopping_list_items_from_import_have_source_recipe_set():
+    call_command("seed_data", "--users=10", "--recipes=10")
+    assert ShoppingListItem.objects.filter(source_recipe__isnull=False).exists()
+
+
+def test_seed_data_with_zero_recipes_does_not_crash_shopping_list_seeding():
+    call_command("seed_data", "--users=5", "--recipes=0")
+    assert ShoppingList.objects.count() == 0

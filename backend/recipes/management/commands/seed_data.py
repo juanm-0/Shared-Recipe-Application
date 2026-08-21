@@ -9,6 +9,7 @@ from faker import Faker
 
 from recipes.models import Ingredient, Recipe, RecipeIngredient, RecipeTag, Review, Tag
 from recipes.utils import get_or_create_ci
+from shopping_list.services import get_or_create_shopping_list, import_recipe_into_shopping_list, merge_or_create_item
 
 User = get_user_model()
 
@@ -58,6 +59,7 @@ class Command(BaseCommand):
             users = self._seed_users(options["users"], fake)
             recipes = self._seed_recipes(options["recipes"], users, fake)
             reviews = self._seed_reviews(recipes, users, fake)
+            self._seed_shopping_lists(users, recipes)
 
             self.stdout.write(
                 self.style.SUCCESS(
@@ -146,3 +148,22 @@ class Command(BaseCommand):
                     )
                 )
         return Review.objects.bulk_create(new_reviews)
+
+    def _seed_shopping_lists(self, users, recipes):
+        if not recipes:
+            return
+        ingredients = list(Ingredient.objects.all())
+        units = [choice[0] for choice in RecipeIngredient.UNIT_CHOICES]
+        for user in users:
+            if random.random() < 0.5:
+                continue
+            import_recipe_into_shopping_list(random.choice(recipes), user)
+
+            shopping_list = get_or_create_shopping_list(user)
+            for _ in range(random.randint(0, 3)):
+                merge_or_create_item(
+                    shopping_list,
+                    random.choice(ingredients),
+                    Decimal(random.randint(50, 500)) / 100,
+                    random.choice(units),
+                )
