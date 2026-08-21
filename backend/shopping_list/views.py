@@ -12,7 +12,7 @@ from .serializers import (
     ShoppingListItemSerializer,
     ShoppingListSerializer,
 )
-from .services import get_or_create_shopping_list, import_recipe_into_shopping_list
+from .services import get_or_create_shopping_list, import_recipe_into_shopping_list, with_prefetched_items
 
 
 class ShoppingListView(APIView):
@@ -20,6 +20,7 @@ class ShoppingListView(APIView):
 
     def get(self, request):
         shopping_list = get_or_create_shopping_list(request.user)
+        shopping_list = with_prefetched_items(shopping_list)
         serializer = ShoppingListSerializer(shopping_list)
         return Response(serializer.data)
 
@@ -43,5 +44,6 @@ class ShoppingListImportView(APIView):
         input_serializer.is_valid(raise_exception=True)
         recipe = get_object_or_404(Recipe, pk=input_serializer.validated_data["recipe_id"])
         shopping_list = import_recipe_into_shopping_list(recipe, request.user)
+        shopping_list = with_prefetched_items(shopping_list)
         output_serializer = ShoppingListSerializer(shopping_list)
         return Response(output_serializer.data, status=status.HTTP_200_OK)

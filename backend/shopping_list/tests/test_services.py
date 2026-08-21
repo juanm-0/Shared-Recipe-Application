@@ -5,7 +5,11 @@ from django.contrib.auth import get_user_model
 
 from recipes.models import Ingredient, Recipe, RecipeIngredient
 from shopping_list.models import ShoppingList, ShoppingListItem
-from shopping_list.services import get_or_create_shopping_list, import_recipe_into_shopping_list
+from shopping_list.services import (
+    get_or_create_shopping_list,
+    import_recipe_into_shopping_list,
+    merge_or_create_item,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -93,3 +97,32 @@ def test_import_recipe_with_multiple_ingredients():
     shopping_list = import_recipe_into_shopping_list(recipe, owner)
 
     assert shopping_list.items.count() == 2
+
+
+def test_merge_or_create_item_preserves_source_recipe_on_merge():
+    owner = User.objects.create_user(username="svc7", password="pw12345")
+    flour = Ingredient.objects.create(name="Flour Svc7")
+    recipe1 = Recipe.objects.create(name="Bread Svc7a", steps=["Mix"], owner=owner)
+    recipe2 = Recipe.objects.create(name="Bread Svc7b", steps=["Mix"], owner=owner)
+    RecipeIngredient.objects.create(recipe=recipe1, ingredient=flour, amount=Decimal("1"), unit="cup", order=0)
+    RecipeIngredient.objects.create(recipe=recipe2, ingredient=flour, amount=Decimal("2"), unit="cup", order=0)
+
+    import_recipe_into_shopping_list(recipe1, owner)
+    shopping_list = import_recipe_into_shopping_list(recipe2, owner)
+
+    item = shopping_list.items.get(ingredient=flour, unit="cup")
+    assert item.amount == Decimal("3")
+    assert item.source_recipe == recipe1
+
+
+def test_add_item_manually_twice_merges_instead_of_duplicating():
+    owner = User.objects.create_user(username="svc8", password="pw12345")
+    flour = Ingredient.objects.create(name="Flour Svc8")
+    shopping_list = get_or_create_shopping_list(owner)
+
+    merge_or_create_item(shopping_list, flour, Decimal("2"), "cup")
+    merge_or_create_item(shopping_list, flour, Decimal("3"), "cup")
+
+    items = list(shopping_list.items.all())
+    assert len(items) == 1
+    assert items[0].amount == Decimal("5")

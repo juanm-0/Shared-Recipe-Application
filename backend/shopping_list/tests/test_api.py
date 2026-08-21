@@ -142,20 +142,20 @@ def test_import_recipe_merges_with_existing_manual_item():
 def test_shopping_list_items_returned_in_deterministic_order():
     owner = User.objects.create_user(username="api12owner", password="pw12345")
     importer = User.objects.create_user(username="api12importer", password="pw12345")
-    eggs = Ingredient.objects.create(name="Eggs Api12")
-    flour = Ingredient.objects.create(name="Flour Api12")
+    zucchini = Ingredient.objects.create(name="Zucchini Api12")
+    mango = Ingredient.objects.create(name="Mango Api12")
     recipe = Recipe.objects.create(name="Cake Api12", steps=["Mix", "Bake"], owner=owner)
-    RecipeIngredient.objects.create(recipe=recipe, ingredient=eggs, amount=Decimal("2"), unit="whole", order=0)
-    RecipeIngredient.objects.create(recipe=recipe, ingredient=flour, amount=Decimal("2"), unit="cup", order=1)
+    RecipeIngredient.objects.create(recipe=recipe, ingredient=zucchini, amount=Decimal("2"), unit="whole", order=0)
+    RecipeIngredient.objects.create(recipe=recipe, ingredient=mango, amount=Decimal("2"), unit="whole", order=1)
 
     client = APIClient()
     client.force_authenticate(user=importer)
     client.post("/api/shopping-list/import/", {"recipe_id": recipe.id})
-    client.post("/api/shopping-list/items/", {"ingredient_name": "Sugar Api12", "amount": "1", "unit": "cup"})
+    client.post("/api/shopping-list/items/", {"ingredient_name": "Apple Api12", "amount": "1", "unit": "cup"})
 
     list_response = client.get("/api/shopping-list/")
     ingredient_names = [item["ingredient_name"] for item in list_response.data["items"]]
-    assert ingredient_names == ["Eggs Api12", "Flour Api12", "Sugar Api12"]
+    assert ingredient_names == ["Zucchini Api12", "Mango Api12", "Apple Api12"]
 
 
 def test_shopping_lists_are_isolated_per_user():
@@ -168,6 +168,83 @@ def test_shopping_lists_are_isolated_per_user():
 
     client_b = APIClient()
     client_b.force_authenticate(user=user_b)
+    client_b.post("/api/shopping-list/items/", {"ingredient_name": "Sugar Api11", "amount": "1", "unit": "cup"})
+
+    response_a = client_a.get("/api/shopping-list/")
     response_b = client_b.get("/api/shopping-list/")
 
-    assert response_b.data["items"] == []
+    assert [item["ingredient_name"] for item in response_a.data["items"]] == ["Flour Api11"]
+    assert [item["ingredient_name"] for item in response_b.data["items"]] == ["Sugar Api11"]
+
+
+def test_add_item_rejects_invalid_unit():
+    user = User.objects.create_user(username="api13", password="pw12345")
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.post(
+        "/api/shopping-list/items/", {"ingredient_name": "Flour Api13", "amount": "1", "unit": "furlong"}
+    )
+
+    assert response.status_code == 400
+    assert response.data["code"] == "validation_error"
+
+
+def test_import_recipe_rejects_non_integer_recipe_id():
+    user = User.objects.create_user(username="api14", password="pw12345")
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    response = client.post("/api/shopping-list/import/", {"recipe_id": "not-a-number"})
+
+    assert response.status_code == 400
+    assert response.data["code"] == "validation_error"
+
+
+def test_import_recipe_rolls_back_fully_on_mid_import_failure():
+    owner = User.objects.create_user(username="api15owner", password="pw12345")
+    importer = User.objects.create_user(username="api15importer", password="pw12345")
+    flour = Ingredient.objects.create(name="Flour Api15")
+    overflow_ingredient = Ingredient.objects.create(name="Overflow Api15")
+    recipe = Recipe.objects.create(name="Bread Api15", steps=["Mix"], owner=owner)
+    RecipeIngredient.objects.create(recipe=recipe, ingredient=flour, amount=Decimal("1"), unit="cup", order=0)
+    RecipeIngredient.objects.create(
+        recipe=recipe, ingredient=overflow_ingredient, amount=Decimal("999999.99"), unit="cup", order=1
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=importer)
+    client.post("/api/shopping-list/items/", {"ingredient_name": "Overflow Api15", "amount": "1", "unit": "cup"})
+
+    response = client.post("/api/shopping-list/import/", {"recipe_id": recipe.id})
+
+    assert response.status_code == 400
+    list_response = client.get("/api/shopping-list/")
+    ingredient_names = [item["ingredient_name"] for item in list_response.data["items"]]
+    assert "Flour Api15" not in ingredient_names
+
+
+def test_add_item_without_csrf_token_is_rejected():
+    user = User.objects.create_user(username="api16", password="pw12345")
+    client = APIClient(enforce_csrf_checks=True)
+    client.login(username="api16", password="pw12345")
+
+    response = client.post(
+        "/api/shopping-list/items/", {"ingredient_name": "Flour Api16", "amount": "1", "unit": "cup"}
+    )
+
+    assert response.status_code == 403
+
+
+def test_add_item_manually_twice_merges_via_api():
+    user = User.objects.create_user(username="api17", password="pw12345")
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    client.post("/api/shopping-list/items/", {"ingredient_name": "Flour Api17", "amount": "2", "unit": "cup"})
+    client.post("/api/shopping-list/items/", {"ingredient_name": "Flour Api17", "amount": "3", "unit": "cup"})
+
+    list_response = client.get("/api/shopping-list/")
+    items = list_response.data["items"]
+    assert len(items) == 1
+    assert Decimal(items[0]["amount"]) == Decimal("5")

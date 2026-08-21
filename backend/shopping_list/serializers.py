@@ -4,7 +4,7 @@ from recipes.models import Ingredient, RecipeIngredient
 from recipes.utils import get_or_create_ci
 
 from .models import ShoppingList, ShoppingListItem
-from .services import get_or_create_shopping_list
+from .services import get_or_create_shopping_list, merge_or_create_item
 
 
 class ShoppingListItemSerializer(serializers.ModelSerializer):
@@ -32,15 +32,9 @@ class ShoppingListItemCreateSerializer(serializers.Serializer):
         user = self.context["request"].user
         shopping_list = get_or_create_shopping_list(user)
         ingredient = get_or_create_ci(Ingredient, validated_data["ingredient_name"])
-        item = ShoppingListItem(
-            shopping_list=shopping_list,
-            ingredient=ingredient,
-            amount=validated_data["amount"],
-            unit=validated_data["unit"],
+        return merge_or_create_item(
+            shopping_list, ingredient, validated_data["amount"], validated_data["unit"]
         )
-        item.full_clean()
-        item.save()
-        return item
 
 
 class ShoppingListImportSerializer(serializers.Serializer):

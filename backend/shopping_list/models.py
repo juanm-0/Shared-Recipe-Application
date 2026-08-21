@@ -38,6 +38,10 @@ class ShoppingListItem(models.Model):
             models.CheckConstraint(
                 condition=models.Q(amount__gt=0), name="shoppinglistitem_amount_gt_0"
             ),
+            models.UniqueConstraint(
+                fields=["shopping_list", "ingredient", "unit"],
+                name="shoppinglistitem_unique_ingredient_unit",
+            ),
         ]
 
     def clean(self):
