@@ -140,7 +140,7 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         return recipe
 
     def update(self, instance, validated_data):
-        client_version = validated_data.pop("version")
+        client_version = validated_data.pop("version", None)
         ingredients_data = validated_data.pop("ingredients", None)
         tags_data = validated_data.pop("tags", None)
 
@@ -148,19 +148,18 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
-        with transaction.atomic():
-            try:
+        try:
+            with transaction.atomic():
                 instance.save()
-            except RecordModifiedError:
-                current = Recipe.objects.get(pk=instance.pk)
-                raise StaleWrite(
-                    current_data=RecipeDetailSerializer(current, context=self.context).data
-                )
-
-            if ingredients_data is not None:
-                self._set_ingredients(instance, ingredients_data)
-            if tags_data is not None:
-                self._set_tags(instance, tags_data)
+                if ingredients_data is not None:
+                    self._set_ingredients(instance, ingredients_data)
+                if tags_data is not None:
+                    self._set_tags(instance, tags_data)
+        except RecordModifiedError:
+            current = Recipe.objects.get(pk=instance.pk)
+            raise StaleWrite(
+                current_data=RecipeDetailSerializer(current, context=self.context).data
+            )
 
         instance.refresh_from_db()
         return instance

@@ -6,7 +6,6 @@ from .models import Ingredient, Recipe, Tag
 @admin.register(Recipe)
 class RecipeAdmin(admin.ModelAdmin):
     list_display = ["name", "owner", "created_at", "updated_at"]
-    list_filter = ["owner"]
     search_fields = ["name"]
 
 

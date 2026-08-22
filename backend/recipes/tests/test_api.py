@@ -1,12 +1,15 @@
 from decimal import Decimal
 
 import pytest
+from concurrency.exceptions import RecordModifiedError
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
-from rest_framework.test import APIClient
+from rest_framework.test import APIClient, APIRequestFactory
 
+from recipes.exceptions import StaleWrite
 from recipes.models import Ingredient, Recipe, RecipeIngredient, RecipeTag, Review, Tag
+from recipes.serializers import RecipeWriteSerializer
 
 pytestmark = pytest.mark.django_db
 
@@ -301,6 +304,54 @@ def test_recipe_update_detects_change_from_another_write_path():
     assert response.status_code == 409
     assert response.data["code"] == "stale_write"
     assert response.data["current"]["name"] == "Changed Elsewhere"
+
+
+def test_recipe_save_raises_record_modified_error_on_stale_version():
+    owner = User.objects.create_user(username="chef_model_race", password="pw12345")
+    recipe = Recipe.objects.create(name="Soup", steps=["Boil"], owner=owner)
+
+    stale_copy = Recipe.objects.get(pk=recipe.pk)
+    recipe.name = "Changed First"
+    recipe.save()
+
+    stale_copy.name = "Changed Second"
+    with pytest.raises(RecordModifiedError):
+        stale_copy.save()
+
+
+def test_recipe_update_returns_stale_write_not_500_on_genuine_race():
+    owner = User.objects.create_user(username="chef_race", password="pw12345")
+    flour = Ingredient.objects.create(name="FlourRace")
+    recipe = Recipe.objects.create(name="Soup", steps=["Boil"], owner=owner)
+    RecipeIngredient.objects.create(
+        recipe=recipe, ingredient=flour, amount=Decimal("1"), unit="cup", order=0
+    )
+
+    factory = APIRequestFactory()
+    request = factory.patch(f"/api/recipes/{recipe.id}/")
+    request.user = owner
+
+    serializer = RecipeWriteSerializer(
+        recipe,
+        data={
+            "name": "API Update",
+            "steps": ["Boil"],
+            "ingredients": [{"ingredient_name": "FlourRace", "amount": "1", "unit": "cup"}],
+            "version": recipe.version,
+        },
+        context={"request": request},
+    )
+    assert serializer.is_valid(), serializer.errors
+
+    # Simulate a genuinely concurrent write landing after validate() but
+    # before save() — the exact race window Fix 1 addresses. A raw
+    # queryset .update() bypasses django-concurrency's own version-bump
+    # logic, so the new version is set explicitly here to simulate what a
+    # real concurrent .save() from another process would have left behind.
+    Recipe.objects.filter(pk=recipe.pk).update(version=recipe.version + 12345)
+
+    with pytest.raises(StaleWrite):
+        serializer.save()
 
 
 def test_recipe_update_requires_version():
