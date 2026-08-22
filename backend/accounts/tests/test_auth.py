@@ -81,3 +81,19 @@ def test_login_requires_csrf_token_for_real_browser_requests():
         "/api/auth/login/", {"username": "chef5", "password": "a-strong-password-1"}, format="json"
     )
     assert response.status_code == 403
+
+
+def test_me_returns_current_user_when_authenticated():
+    user = User.objects.create_user(username="chef_me", password="a-strong-password-1")
+    client = APIClient()
+    client.force_authenticate(user=user)
+    response = client.get("/api/auth/me/")
+    assert response.status_code == 200
+    assert response.data["id"] == user.id
+    assert response.data["username"] == "chef_me"
+
+
+def test_me_requires_authentication():
+    client = APIClient()
+    response = client.get("/api/auth/me/")
+    assert response.status_code == 401
