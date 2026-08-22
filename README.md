@@ -79,8 +79,9 @@ Each rule should have only one place to change and one place to test, to ensure 
 
 ### Concurrency
 
-Optimistic locking is used instead of database-level row locking. Recipe edits are not a high contention path. Using `updated_at` allows to reject writes with a 409.
-With this, we don't solve a problem that I foresee to be a rare issue (admin and user editing the same recipe), and having other request pay the price.
+Optimistic locking is used instead of database-level row locking. Recipe edits are not a high contention path, so this avoids making every request pay for a lock that's almost never contended.
+
+Uses `django-concurrency`'s `IntegerVersionField` and the version check is enforced inside `Model.save()` so it protects every write path uniformly for both REST API and Django Admin.
 
 ### Authentication
 
