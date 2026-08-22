@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "accounts",
     "recipes",
     "shopping_list",
+    "concurrency",
 ]
 
 MIDDLEWARE = [
