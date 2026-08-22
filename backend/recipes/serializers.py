@@ -1,3 +1,4 @@
+from concurrency.exceptions import RecordModifiedError
 from django.db import IntegrityError, transaction
 from rest_framework import serializers
 from accounts.permissions import is_owner_or_staff
@@ -56,12 +57,13 @@ class RecipeDetailSerializer(serializers.ModelSerializer):
     original_recipe = serializers.PrimaryKeyRelatedField(read_only=True)
     original_owner = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
+    version = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Recipe
         fields = [
             "id", "name", "steps", "image", "owner", "original_recipe", "original_owner",
-            "ingredients", "tags", "reviews", "can_edit",
+            "ingredients", "tags", "reviews", "can_edit", "version",
             "created_at", "updated_at",
         ]
 
@@ -91,11 +93,11 @@ class RecipeIngredientWriteSerializer(serializers.Serializer):
 class RecipeWriteSerializer(serializers.ModelSerializer):
     ingredients = RecipeIngredientWriteSerializer(many=True)
     tags = serializers.ListField(child=serializers.CharField(max_length=100), required=False, default=list)
-    expected_updated_at = serializers.DateTimeField(write_only=True, required=False)
+    version = serializers.IntegerField(write_only=True, required=False)
 
     class Meta:
         model = Recipe
-        fields = ["name", "steps", "image", "ingredients", "tags", "expected_updated_at"]
+        fields = ["name", "steps", "image", "ingredients", "tags", "version"]
 
     def validate_ingredients(self, value):
         if not value:
@@ -114,18 +116,19 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         if self.instance is not None:
-            expected = attrs.get("expected_updated_at")
-            if expected is None:
+            version = attrs.get("version")
+            if version is None:
                 raise serializers.ValidationError(
-                    {"expected_updated_at": "This field is required for updates."}
+                    {"version": "This field is required for updates."}
                 )
-            if expected != self.instance.updated_at:
+            if version != self.instance.version:
                 raise StaleWrite(
                     current_data=RecipeDetailSerializer(self.instance, context=self.context).data
                 )
         return attrs
 
     def create(self, validated_data):
+        validated_data.pop("version", None)
         ingredients_data = validated_data.pop("ingredients")
         tags_data = validated_data.pop("tags", [])
         request = self.context["request"]
@@ -137,14 +140,22 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         return recipe
 
     def update(self, instance, validated_data):
-        validated_data.pop("expected_updated_at", None)
+        client_version = validated_data.pop("version")
         ingredients_data = validated_data.pop("ingredients", None)
         tags_data = validated_data.pop("tags", None)
 
+        instance.version = client_version
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
         with transaction.atomic():
-            for attr, value in validated_data.items():
-                setattr(instance, attr, value)
-            instance.save()
+            try:
+                instance.save()
+            except RecordModifiedError:
+                current = Recipe.objects.get(pk=instance.pk)
+                raise StaleWrite(
+                    current_data=RecipeDetailSerializer(current, context=self.context).data
+                )
 
             if ingredients_data is not None:
                 self._set_ingredients(instance, ingredients_data)

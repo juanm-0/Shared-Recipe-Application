@@ -259,11 +259,12 @@ def test_recipe_update_happy_path():
     client.force_authenticate(user=owner)
     payload = {
         "name": "Better Soup",
-        "expected_updated_at": recipe.updated_at.isoformat(),
+        "version": recipe.version,
     }
     response = client.patch(f"/api/recipes/{recipe.id}/", payload, format="json")
     assert response.status_code == 200
     assert response.data["name"] == "Better Soup"
+    assert response.data["version"] > recipe.version
 
 
 def test_recipe_update_rejects_stale_write():
@@ -274,7 +275,7 @@ def test_recipe_update_rejects_stale_write():
     client.force_authenticate(user=owner)
     response = client.patch(
         f"/api/recipes/{recipe.id}/",
-        {"name": "New Name", "expected_updated_at": "2000-01-01T00:00:00Z"},
+        {"name": "New Name", "version": recipe.version + 999},
         format="json",
     )
     assert response.status_code == 409
@@ -282,7 +283,27 @@ def test_recipe_update_rejects_stale_write():
     assert response.data["current"]["name"] == "Soup"
 
 
-def test_recipe_update_requires_expected_updated_at():
+def test_recipe_update_detects_change_from_another_write_path():
+    owner = User.objects.create_user(username="chef13c", password="pw12345")
+    recipe = Recipe.objects.create(name="Soup", steps=["Boil"], owner=owner)
+    client = APIClient()
+    client.force_authenticate(user=owner)
+
+    stale_version = recipe.version
+    recipe.name = "Changed Elsewhere"
+    recipe.save()
+
+    response = client.patch(
+        f"/api/recipes/{recipe.id}/",
+        {"name": "API Update", "version": stale_version},
+        format="json",
+    )
+    assert response.status_code == 409
+    assert response.data["code"] == "stale_write"
+    assert response.data["current"]["name"] == "Changed Elsewhere"
+
+
+def test_recipe_update_requires_version():
     owner = User.objects.create_user(username="chef13b", password="pw12345")
     recipe = Recipe.objects.create(name="Soup", steps=["Boil"], owner=owner)
 
@@ -301,7 +322,7 @@ def test_recipe_update_rejects_non_owner():
     client.force_authenticate(user=other)
     response = client.patch(
         f"/api/recipes/{recipe.id}/",
-        {"name": "Hijacked", "expected_updated_at": recipe.updated_at.isoformat()},
+        {"name": "Hijacked", "version": recipe.version},
         format="json",
     )
     assert response.status_code == 403
@@ -317,7 +338,7 @@ def test_recipe_update_replaces_tags_fully():
     client.force_authenticate(user=owner)
     response = client.patch(
         f"/api/recipes/{recipe.id}/",
-        {"tags": ["New15"], "expected_updated_at": recipe.updated_at.isoformat()},
+        {"tags": ["New15"], "version": recipe.version},
         format="json",
     )
     assert response.status_code == 200
@@ -339,7 +360,7 @@ def test_recipe_patch_without_tags_or_ingredients_preserves_them():
     client.force_authenticate(user=owner)
     response = client.patch(
         f"/api/recipes/{recipe.id}/",
-        {"name": "Renamed", "expected_updated_at": recipe.updated_at.isoformat()},
+        {"name": "Renamed", "version": recipe.version},
         format="json",
     )
     assert response.status_code == 200
