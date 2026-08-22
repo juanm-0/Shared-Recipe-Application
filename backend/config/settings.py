@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "corsheaders",
     "rest_framework",
     "accounts",
     "recipes",
@@ -29,6 +30,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -105,3 +107,8 @@ CSRF_COOKIE_HTTPONLY = False
 CSRF_TRUSTED_ORIGINS = os.environ.get(
     "DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost:5173,http://localhost:8000"
 ).split(",")
+
+CORS_ALLOWED_ORIGINS = os.environ.get(
+    "DJANGO_CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:8000"
+).split(",")
+CORS_ALLOW_CREDENTIALS = True
