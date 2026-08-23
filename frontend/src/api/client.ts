@@ -5,14 +5,18 @@ export class ApiError extends Error {
   errors?: unknown
   current?: unknown
 
-  constructor(status: number, body: { detail: string; code: string; errors?: unknown; current?: unknown }) {
-    super(body.detail)
+  constructor(
+    status: number,
+    body: { detail?: string; code?: string; errors?: unknown; current?: unknown } | undefined,
+  ) {
+    const detail = body?.detail ?? 'Something went wrong.'
+    super(detail)
     this.name = 'ApiError'
     this.status = status
-    this.detail = body.detail
-    this.code = body.code
-    this.errors = body.errors
-    this.current = body.current
+    this.detail = detail
+    this.code = body?.code ?? 'unknown_error'
+    this.errors = body?.errors
+    this.current = body?.current
   }
 }
 
@@ -54,10 +58,15 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   }
 
   const text = await response.text()
-  const data = text ? JSON.parse(text) : undefined
+  let data: unknown
+  try {
+    data = text ? JSON.parse(text) : undefined
+  } catch {
+    data = undefined
+  }
 
   if (!response.ok) {
-    throw new ApiError(response.status, data)
+    throw new ApiError(response.status, data as { detail?: string; code?: string; errors?: unknown; current?: unknown } | undefined)
   }
 
   return data as T
