@@ -97,6 +97,10 @@ function HomePage() {
     <div>
       <h1>Recipes</h1>
 
+      <p>
+        <Link to="/recipes/new">Create recipe</Link>
+      </p>
+
       <div>
         <label htmlFor="sort">Sort</label>
         <select

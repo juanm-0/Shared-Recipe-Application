@@ -52,6 +52,12 @@ function AuthStatus() {
     return (
       <div>
         <span>Hello, {me.data.username}</span>
+        <Link to="/" search={{ sort: '-created_at', page: 1 }}>
+          All recipes
+        </Link>
+        <Link to="/" search={{ sort: '-created_at', page: 1, owner: me.data.id }}>
+          My recipes
+        </Link>
         <button type="button" onClick={() => logout.mutate()} disabled={logout.isPending}>
           Log out
         </button>
