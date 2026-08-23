@@ -165,7 +165,7 @@ function HomePage() {
           <ul>
             {recipesQuery.data.results.map((recipe) => (
               <li key={recipe.id}>
-                <Link to="/recipes/$recipeId" params={{ recipeId: String(recipe.id) }}>
+                <Link to="/recipes/$recipeId" params={{ recipeId: String(recipe.id) }} search={search}>
                   {recipe.image ? (
                     <img src={recipe.image} alt={recipe.name} width={120} height={120} />
                   ) : (

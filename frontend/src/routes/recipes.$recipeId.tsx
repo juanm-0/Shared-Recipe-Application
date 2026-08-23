@@ -1,30 +1,63 @@
+import type { ReactNode } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useRecipe } from '../hooks/useRecipe'
 import { getErrorMessage } from '../api/client'
 
 export const Route = createFileRoute('/recipes/$recipeId')({
+  validateSearch: (search: Record<string, unknown>) => search,
   component: RecipeDetailPage,
 })
 
 function RecipeDetailPage() {
   const { recipeId } = Route.useParams()
-  const recipeQuery = useRecipe(Number(recipeId))
+  const numericRecipeId = Number(recipeId)
+
+  const backLink = (
+    <p>
+      <Link to="/" search={(prev) => prev}>
+        Back to recipes
+      </Link>
+    </p>
+  )
+
+  if (Number.isNaN(numericRecipeId)) {
+    return (
+      <div>
+        {backLink}
+        <p role="alert">Recipe not found.</p>
+      </div>
+    )
+  }
+
+  return <RecipeDetailView recipeId={numericRecipeId} backLink={backLink} />
+}
+
+function RecipeDetailView({ recipeId, backLink }: { recipeId: number; backLink: ReactNode }) {
+  const recipeQuery = useRecipe(recipeId)
 
   if (recipeQuery.isPending) {
-    return <p>Loading recipe...</p>
+    return (
+      <div>
+        {backLink}
+        <p>Loading recipe...</p>
+      </div>
+    )
   }
 
   if (recipeQuery.isError) {
-    return <p role="alert">{getErrorMessage(recipeQuery.error)}</p>
+    return (
+      <div>
+        {backLink}
+        <p role="alert">{getErrorMessage(recipeQuery.error)}</p>
+      </div>
+    )
   }
 
   const recipe = recipeQuery.data
 
   return (
     <div>
-      <p>
-        <Link to="/">Back to recipes</Link>
-      </p>
+      {backLink}
 
       <h1>{recipe.name}</h1>
 

@@ -22,6 +22,7 @@ class RecipeListSerializer(serializers.ModelSerializer):
     average_rating = serializers.FloatField(read_only=True, allow_null=True)
     review_count = serializers.IntegerField(read_only=True)
     tags = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Recipe
@@ -31,6 +32,9 @@ class RecipeListSerializer(serializers.ModelSerializer):
         return TagSerializer(
             [recipe_tag.tag for recipe_tag in obj.recipe_tags.all()[:3]], many=True
         ).data
+
+    def get_image(self, obj):
+        return obj.image.url if obj.image else None
 
 
 class RecipeIngredientReadSerializer(serializers.ModelSerializer):
@@ -58,6 +62,7 @@ class RecipeDetailSerializer(serializers.ModelSerializer):
     original_owner = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
     version = serializers.IntegerField(read_only=True)
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Recipe
@@ -71,6 +76,9 @@ class RecipeDetailSerializer(serializers.ModelSerializer):
         return TagSerializer(
             [recipe_tag.tag for recipe_tag in obj.recipe_tags.all()], many=True
         ).data
+
+    def get_image(self, obj):
+        return obj.image.url if obj.image else None
 
     def get_can_edit(self, obj):
         request = self.context.get("request")
