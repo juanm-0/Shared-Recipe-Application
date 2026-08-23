@@ -21,6 +21,41 @@ export interface PaginatedResponse<T> {
 // Valid `sort` values accepted by RecipeViewSet._apply_sort.
 export type RecipeSort = 'name' | '-name' | 'created_at' | '-created_at' | 'rating' | '-rating'
 
+export type RecipeUnit =
+  | 'g' | 'kg' | 'ml' | 'l' | 'cup' | 'tbsp' | 'tsp'
+  | 'pinch' | 'dash' | 'to_taste' | 'whole' | 'clove'
+
+// Matches RecipeIngredient.UNIT_CHOICES in backend/recipes/models.py exactly.
+export const UNIT_OPTIONS: { value: RecipeUnit; label: string }[] = [
+  { value: 'g', label: 'Gram' },
+  { value: 'kg', label: 'Kilogram' },
+  { value: 'ml', label: 'Milliliter' },
+  { value: 'l', label: 'Liter' },
+  { value: 'cup', label: 'Cup' },
+  { value: 'tbsp', label: 'Tablespoon' },
+  { value: 'tsp', label: 'Teaspoon' },
+  { value: 'pinch', label: 'Pinch' },
+  { value: 'dash', label: 'Dash' },
+  { value: 'to_taste', label: 'To taste' },
+  { value: 'whole', label: 'Whole' },
+  { value: 'clove', label: 'Clove' },
+]
+
+// Matches RecipeIngredientWriteSerializer in backend/recipes/serializers.py exactly.
+export interface RecipeIngredientWrite {
+  ingredient_name: string
+  amount: string
+  unit: RecipeUnit
+}
+
+// Matches RecipeWriteSerializer's JSON-only fields 
+export interface RecipeWriteData {
+  name: string
+  steps: string[]
+  ingredients: RecipeIngredientWrite[]
+  tags: string[]
+}
+
 export interface ListRecipesParams {
   sort?: RecipeSort
   tag?: number
@@ -80,4 +115,39 @@ export function listRecipes(params: ListRecipesParams = {}): Promise<PaginatedRe
   const queryString = query.toString()
   const path = queryString ? `/api/recipes/?${queryString}` : '/api/recipes/'
   return apiFetch(path)
+}
+
+export function createRecipe(data: RecipeWriteData): Promise<RecipeDetail> {
+  return apiFetch('/api/recipes/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function updateRecipe(
+  id: number,
+  data: RecipeWriteData & { version: number },
+): Promise<RecipeDetail> {
+  return apiFetch(`/api/recipes/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+// Separate request from updateRecipe/createRecipe 
+// DRF's multipart parser doesn't deserialize the nested `ingredients` list, 
+// so image and structured data can't travel in one 
+// multipart request without a backend change.
+export function updateRecipeImage(id: number, version: number, image: File): Promise<RecipeDetail> {
+  const formData = new FormData()
+  formData.append('version', String(version))
+  formData.append('image', image)
+  return apiFetch(`/api/recipes/${id}/`, {
+    method: 'PATCH',
+    body: formData,
+  })
+}
+
+export function deleteRecipe(id: number): Promise<void> {
+  return apiFetch(`/api/recipes/${id}/`, { method: 'DELETE' })
 }
