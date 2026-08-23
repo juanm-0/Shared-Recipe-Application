@@ -80,12 +80,17 @@ export async function ensureCsrfCookie(): Promise<void> {
 // For validation errors, `detail` is just the generic "Validation failed."
 // wrapper — the useful message(s) live in `errors`, keyed by field name,
 // each an array of strings (DRF's standard validation error shape).
+function flattenErrorValues(value: unknown): string[] {
+  if (typeof value === 'string') return [value]
+  if (Array.isArray(value)) return value.flatMap(flattenErrorValues)
+  if (value && typeof value === 'object') return Object.values(value).flatMap(flattenErrorValues)
+  return [String(value)]
+}
+
 export function getErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.code === 'validation_error' && error.errors && typeof error.errors === 'object') {
-      const messages = Object.values(error.errors as Record<string, unknown>)
-        .flatMap((value) => (Array.isArray(value) ? value : [value]))
-        .map((value) => String(value))
+      const messages = flattenErrorValues(error.errors)
       if (messages.length > 0) {
         return messages.join(' ')
       }

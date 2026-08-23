@@ -105,6 +105,7 @@ function EditRecipeView({ recipeId }: { recipeId: number }) {
               const current = (updateRecipe.error as ApiError).current as RecipeDetail
               setPinnedRecipe(current)
               setResetKey((k) => k + 1)
+              updateRecipe.reset()
             }}
           >
             Reload latest version
@@ -132,13 +133,24 @@ function EditRecipeView({ recipeId }: { recipeId: number }) {
           updateRecipe.mutate(
             { data: { ...data, version: recipe.version }, image },
             {
-              onSuccess: () => {
+              onSuccess: ({ imageError }) => {
+                if (imageError) {
+                  return
+                }
                 navigate({ to: '/recipes/$recipeId', params: { recipeId: String(recipeId) } })
               },
             },
           )
         }}
       />
+      {updateRecipe.isSuccess && updateRecipe.data.imageError && (
+        <p role="alert">
+          Recipe saved, but the image could not be uploaded: {updateRecipe.data.imageError}.{' '}
+          <Link to="/recipes/$recipeId" params={{ recipeId: String(recipeId) }}>
+            View recipe
+          </Link>
+        </p>
+      )}
     </div>
   )
 }

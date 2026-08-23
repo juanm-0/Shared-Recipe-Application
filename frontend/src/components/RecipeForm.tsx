@@ -36,7 +36,7 @@ export function RecipeForm({ initialValues, onSubmit, isPending, submitLabel, er
       {
         name,
         steps: steps.filter((s) => s.trim() !== ''),
-        ingredients,
+        ingredients: ingredients.filter((ing) => ing.ingredient_name.trim() !== ''),
         tags: tags.filter((t) => t.trim() !== ''),
       },
       image,
