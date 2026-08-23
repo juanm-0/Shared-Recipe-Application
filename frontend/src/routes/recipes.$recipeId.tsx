@@ -1,8 +1,16 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useRecipe } from '../hooks/useRecipe'
 import { useDeleteRecipe } from '../hooks/useDeleteRecipe'
-import { getErrorMessage } from '../api/client'
+import { useMe } from '../hooks/useMe'
+import { useCreateReview } from '../hooks/useCreateReview'
+import { useUpdateReview } from '../hooks/useUpdateReview'
+import { useDeleteReview } from '../hooks/useDeleteReview'
+import { useCopyRecipe } from '../hooks/useCopyRecipe'
+import { ApiError, getErrorMessage } from '../api/client'
+import { ReviewForm } from '../components/ReviewForm'
+import type { RecipeDetail, ReviewRead } from '../api/recipes'
 
 export const Route = createFileRoute('/recipes/$recipeId')({
   validateSearch: (search: Record<string, unknown>) => search,
@@ -115,6 +123,8 @@ function RecipeDetailView({ recipeId, backLink }: { recipeId: number; backLink: 
         </p>
       )}
 
+      <CopyButton recipe={recipe} />
+
       <h2>Steps</h2>
       <ol>
         {recipe.steps.map((step, index) => (
@@ -138,12 +148,62 @@ function RecipeDetailView({ recipeId, backLink }: { recipeId: number; backLink: 
         ))}
       </ul>
 
+      <ReviewsSection recipe={recipe} recipeId={recipeId} />
+    </div>
+  )
+}
+
+function ReviewsSection({ recipe, recipeId }: { recipe: RecipeDetail; recipeId: number }) {
+  const me = useMe()
+  const createReview = useCreateReview(recipeId)
+  const deleteReview = useDeleteReview(recipeId)
+  const [isEditingReview, setIsEditingReview] = useState(false)
+
+  const myReview = me.data ? recipe.reviews.find((r) => r.username === me.data.username) : undefined
+  const otherReviews = recipe.reviews.filter((r) => r !== myReview)
+
+  return (
+    <div>
       <h2>Reviews</h2>
-      {recipe.reviews.length === 0 ? (
-        <p>No reviews yet</p>
-      ) : (
+
+      {myReview && !isEditingReview && (
+        <div>
+          <strong>Your review</strong>
+          <p>{myReview.rating}/5</p>
+          {myReview.comment && <p>{myReview.comment}</p>}
+          <button type="button" onClick={() => setIsEditingReview(true)}>
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm('Delete your review?')) {
+                deleteReview.mutate(myReview.id)
+              }
+            }}
+            disabled={deleteReview.isPending}
+          >
+            Delete
+          </button>
+          {deleteReview.isError && <p role="alert">{getErrorMessage(deleteReview.error)}</p>}
+        </div>
+      )}
+
+      {myReview && isEditingReview && (
+        <EditReviewForm
+          recipeId={recipeId}
+          review={myReview}
+          onDone={() => setIsEditingReview(false)}
+        />
+      )}
+
+      {!myReview && me.isSuccess && <NewReviewForm createReview={createReview} />}
+
+      {recipe.reviews.length === 0 && <p>No reviews yet</p>}
+
+      {otherReviews.length > 0 && (
         <ul>
-          {recipe.reviews.map((review) => (
+          {otherReviews.map((review) => (
             <li key={review.id}>
               <strong>{review.username}</strong> - {review.rating}/5
               {review.comment && <p>{review.comment}</p>}
@@ -152,5 +212,78 @@ function RecipeDetailView({ recipeId, backLink }: { recipeId: number; backLink: 
         </ul>
       )}
     </div>
+  )
+}
+
+function NewReviewForm({
+  createReview,
+}: {
+  createReview: ReturnType<typeof useCreateReview>
+}) {
+  const isDuplicateError =
+    createReview.isError && createReview.error instanceof ApiError && createReview.error.code === 'duplicate_review'
+
+  return (
+    <ReviewForm
+      initialValues={{ rating: 5, comment: '' }}
+      submitLabel="Submit review"
+      isPending={createReview.isPending}
+      errorMessage={createReview.isError && !isDuplicateError ? getErrorMessage(createReview.error) : undefined}
+      onSubmit={(data) => createReview.mutate(data)}
+    />
+  )
+}
+
+function EditReviewForm({
+  recipeId,
+  review,
+  onDone,
+}: {
+  recipeId: number
+  review: ReviewRead
+  onDone: () => void
+}) {
+  const updateReview = useUpdateReview(recipeId, review.id)
+
+  return (
+    <ReviewForm
+      initialValues={{ rating: review.rating, comment: review.comment }}
+      submitLabel="Save review"
+      isPending={updateReview.isPending}
+      errorMessage={updateReview.isError ? getErrorMessage(updateReview.error) : undefined}
+      onCancel={onDone}
+      onSubmit={(data) => {
+        updateReview.mutate(data, { onSuccess: onDone })
+      }}
+    />
+  )
+}
+
+function CopyButton({ recipe }: { recipe: RecipeDetail }) {
+  const me = useMe()
+  const copyRecipe = useCopyRecipe()
+  const navigate = useNavigate()
+
+  if (!me.data || recipe.owner === me.data.username) {
+    return null
+  }
+
+  return (
+    <p>
+      <button
+        type="button"
+        onClick={() => {
+          copyRecipe.mutate(recipe.id, {
+            onSuccess: (newRecipe) => {
+              navigate({ to: '/recipes/$recipeId', params: { recipeId: String(newRecipe.id) } })
+            },
+          })
+        }}
+        disabled={copyRecipe.isPending}
+      >
+        Copy recipe
+      </button>
+      {copyRecipe.isError && <p role="alert">{getErrorMessage(copyRecipe.error)}</p>}
+    </p>
   )
 }
