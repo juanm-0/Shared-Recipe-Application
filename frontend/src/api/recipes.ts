@@ -30,6 +30,43 @@ export interface ListRecipesParams {
   page?: number
 }
 
+export interface RecipeIngredientRead {
+  ingredient_name: string
+  amount: string
+  unit: string
+  order: number
+}
+
+export interface ReviewRead {
+  id: number
+  username: string
+  rating: number
+  comment: string
+  created_at: string
+  updated_at: string
+}
+
+export interface RecipeDetail {
+  id: number
+  name: string
+  steps: string[]
+  image: string | null
+  owner: string
+  original_recipe: number | null
+  original_owner: string | null
+  ingredients: RecipeIngredientRead[]
+  tags: Tag[]
+  reviews: ReviewRead[]
+  can_edit: boolean
+  version: number
+  created_at: string
+  updated_at: string
+}
+
+export function getRecipe(id: number): Promise<RecipeDetail> {
+  return apiFetch(`/api/recipes/${id}/`)
+}
+
 export function listRecipes(params: ListRecipesParams = {}): Promise<PaginatedResponse<RecipeListItem>> {
   const query = new URLSearchParams()
 
