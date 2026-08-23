@@ -48,12 +48,17 @@ export interface RecipeIngredientWrite {
   unit: RecipeUnit
 }
 
-// Matches RecipeWriteSerializer's JSON-only fields 
+// Matches RecipeWriteSerializer's JSON-only fields
 export interface RecipeWriteData {
   name: string
   steps: string[]
   ingredients: RecipeIngredientWrite[]
   tags: string[]
+}
+
+export interface ReviewWriteData {
+  rating: number
+  comment: string
 }
 
 export interface ListRecipesParams {
@@ -150,4 +155,30 @@ export function updateRecipeImage(id: number, version: number, image: File): Pro
 
 export function deleteRecipe(id: number): Promise<void> {
   return apiFetch(`/api/recipes/${id}/`, { method: 'DELETE' })
+}
+
+export function createReview(recipeId: number, data: ReviewWriteData): Promise<ReviewRead> {
+  return apiFetch(`/api/recipes/${recipeId}/reviews/`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function updateReview(
+  recipeId: number,
+  reviewId: number,
+  data: ReviewWriteData,
+): Promise<ReviewRead> {
+  return apiFetch(`/api/recipes/${recipeId}/reviews/${reviewId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteReview(recipeId: number, reviewId: number): Promise<void> {
+  return apiFetch(`/api/recipes/${recipeId}/reviews/${reviewId}/`, { method: 'DELETE' })
+}
+
+export function copyRecipe(id: number): Promise<RecipeDetail> {
+  return apiFetch(`/api/recipes/${id}/copy/`, { method: 'POST' })
 }
