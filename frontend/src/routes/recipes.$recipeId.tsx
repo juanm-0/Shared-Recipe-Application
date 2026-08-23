@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useRecipe } from '../hooks/useRecipe'
+import { useDeleteRecipe } from '../hooks/useDeleteRecipe'
 import { getErrorMessage } from '../api/client'
 
 export const Route = createFileRoute('/recipes/$recipeId')({
@@ -34,6 +35,8 @@ function RecipeDetailPage() {
 
 function RecipeDetailView({ recipeId, backLink }: { recipeId: number; backLink: ReactNode }) {
   const recipeQuery = useRecipe(recipeId)
+  const deleteRecipe = useDeleteRecipe()
+  const navigate = useNavigate()
 
   if (recipeQuery.isPending) {
     return (
@@ -54,6 +57,17 @@ function RecipeDetailView({ recipeId, backLink }: { recipeId: number; backLink: 
   }
 
   const recipe = recipeQuery.data
+
+  function handleDelete() {
+    if (!window.confirm(`Delete "${recipe.name}"? This cannot be undone.`)) {
+      return
+    }
+    deleteRecipe.mutate(recipeId, {
+      onSuccess: () => {
+        navigate({ to: '/' })
+      },
+    })
+  }
 
   return (
     <div>
@@ -89,7 +103,17 @@ function RecipeDetailView({ recipeId, backLink }: { recipeId: number; backLink: 
         </p>
       )}
 
-      {recipe.can_edit && <p>(editing coming soon)</p>}
+      {recipe.can_edit && (
+        <p>
+          <Link to="/recipes/$recipeId/edit" params={{ recipeId: String(recipe.id) }}>
+            Edit
+          </Link>
+          <button type="button" onClick={handleDelete} disabled={deleteRecipe.isPending}>
+            Delete
+          </button>
+          {deleteRecipe.isError && <p role="alert">{getErrorMessage(deleteRecipe.error)}</p>}
+        </p>
+      )}
 
       <h2>Steps</h2>
       <ol>
