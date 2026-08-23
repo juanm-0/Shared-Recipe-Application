@@ -83,6 +83,17 @@ def test_login_requires_csrf_token_for_real_browser_requests():
     assert response.status_code == 403
 
 
+def test_register_requires_csrf_token_for_real_browser_requests():
+    strict_client = APIClient(enforce_csrf_checks=True)
+    strict_client.get("/api/auth/csrf/")  # sets the cookie but we deliberately don't echo it
+    response = strict_client.post(
+        "/api/auth/register/",
+        {"username": "chef_csrf", "email": "chef_csrf@example.com", "password": "a-strong-password-1"},
+        format="json",
+    )
+    assert response.status_code == 403
+
+
 def test_me_returns_current_user_when_authenticated():
     user = User.objects.create_user(username="chef_me", password="a-strong-password-1")
     client = APIClient()

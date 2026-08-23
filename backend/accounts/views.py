@@ -29,6 +29,7 @@ class MeView(APIView):
         return Response(_user_payload(request.user), status=status.HTTP_200_OK)
 
 
+@method_decorator(csrf_protect, name="dispatch")
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
