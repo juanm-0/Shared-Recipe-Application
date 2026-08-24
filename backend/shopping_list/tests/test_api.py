@@ -249,6 +249,7 @@ def test_add_item_manually_twice_merges_via_api():
     assert len(items) == 1
     assert Decimal(items[0]["amount"]) == Decimal("5")
 
+
 def test_update_item_amount():
     user = User.objects.create_user(username="api20", password="pw12345")
     client = APIClient()

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useShoppingList } from '../hooks/useShoppingList'
 import { useAddShoppingListItem } from '../hooks/useAddShoppingListItem'
@@ -7,7 +7,7 @@ import { useDeleteShoppingListItem } from '../hooks/useDeleteShoppingListItem'
 import { useIngredients } from '../hooks/useIngredients'
 import { UNIT_OPTIONS, type RecipeUnit } from '../api/recipes'
 import type { ShoppingListItem } from '../api/shoppingList'
-import { getErrorMessage } from '../api/client'
+import { ApiError, getErrorMessage } from '../api/client'
 
 export const Route = createFileRoute('/shopping-list')({
   component: ShoppingListPage,
@@ -47,7 +47,14 @@ function ShoppingListItemRow({ item }: { item: ShoppingListItem }) {
   const updateItem = useUpdateShoppingListItem()
   const deleteItem = useDeleteShoppingListItem()
 
+  useEffect(() => {
+    setAmount(item.amount)
+  }, [item.amount])
+
   function handleSave() {
+    if (!(Number(amount) > 0)) {
+      return
+    }
     updateItem.mutate({ itemId: item.id, amount })
   }
 
@@ -57,9 +64,10 @@ function ShoppingListItemRow({ item }: { item: ShoppingListItem }) {
       <input
         type="number"
         step="0.01"
-        min="0"
+        min="0.01"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
+        aria-label={`Amount of ${item.ingredient_name}`}
       />{' '}
       {item.unit}
       <button type="button" onClick={handleSave} disabled={updateItem.isPending}>
@@ -76,8 +84,12 @@ function ShoppingListItemRow({ item }: { item: ShoppingListItem }) {
       >
         Delete
       </button>
-      {updateItem.isError && <p role="alert">{getErrorMessage(updateItem.error)}</p>}
-      {deleteItem.isError && <p role="alert">{getErrorMessage(deleteItem.error)}</p>}
+      {updateItem.isError && !(updateItem.error instanceof ApiError && updateItem.error.status === 404) && (
+        <p role="alert">{getErrorMessage(updateItem.error)}</p>
+      )}
+      {deleteItem.isError && !(deleteItem.error instanceof ApiError && deleteItem.error.status === 404) && (
+        <p role="alert">{getErrorMessage(deleteItem.error)}</p>
+      )}
     </li>
   )
 }
@@ -127,7 +139,7 @@ function AddItemForm() {
           id="shopping-item-amount"
           type="number"
           step="0.01"
-          min="0"
+          min="0.01"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           required

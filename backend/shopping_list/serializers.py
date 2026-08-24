@@ -14,6 +14,7 @@ class ShoppingListItemSerializer(serializers.ModelSerializer):
         model = ShoppingListItem
         fields = ["id", "ingredient_name", "amount", "unit", "is_checked", "source_recipe"]
 
+
 class ShoppingListItemUpdateSerializer(serializers.ModelSerializer):
     amount = serializers.DecimalField(max_digits=8, decimal_places=2)
 
@@ -26,7 +27,7 @@ class ShoppingListItemUpdateSerializer(serializers.ModelSerializer):
         instance.full_clean()
         instance.save()
         return instance
-    
+
 
 class ShoppingListSerializer(serializers.ModelSerializer):
     items = ShoppingListItemSerializer(many=True, read_only=True)

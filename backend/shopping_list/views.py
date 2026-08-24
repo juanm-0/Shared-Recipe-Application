@@ -37,6 +37,7 @@ class ShoppingListItemCreateView(APIView):
         output_serializer = ShoppingListItemSerializer(item)
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
+
 class ShoppingListItemDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -56,6 +57,7 @@ class ShoppingListItemDetailView(APIView):
         item = self._get_item(request, item_id)
         item.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class ShoppingListImportView(APIView):
     permission_classes = [IsAuthenticated]
