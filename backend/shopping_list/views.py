@@ -5,11 +5,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from recipes.models import Recipe
+from shopping_list.models import ShoppingListItem
 
 from .serializers import (
     ShoppingListImportSerializer,
     ShoppingListItemCreateSerializer,
     ShoppingListItemSerializer,
+    ShoppingListItemUpdateSerializer,
     ShoppingListSerializer,
 )
 from .services import get_or_create_shopping_list, import_recipe_into_shopping_list, with_prefetched_items
@@ -35,6 +37,25 @@ class ShoppingListItemCreateView(APIView):
         output_serializer = ShoppingListItemSerializer(item)
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
+class ShoppingListItemDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _get_item(self, request, item_id):
+        item = get_object_or_404(ShoppingListItem, pk=item_id, shopping_list__user=request.user)
+        return item
+
+    def patch(self, request, item_id):
+        item = self._get_item(request, item_id)
+        serializer = ShoppingListItemUpdateSerializer(item, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        item = serializer.save()
+        output_serializer = ShoppingListItemSerializer(item)
+        return Response(output_serializer.data, status=status.HTTP_200_OK)
+
+    def delete(self, request, item_id):
+        item = self._get_item(request, item_id)
+        item.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class ShoppingListImportView(APIView):
     permission_classes = [IsAuthenticated]

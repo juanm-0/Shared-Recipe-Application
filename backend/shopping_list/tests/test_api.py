@@ -248,3 +248,114 @@ def test_add_item_manually_twice_merges_via_api():
     items = list_response.data["items"]
     assert len(items) == 1
     assert Decimal(items[0]["amount"]) == Decimal("5")
+
+def test_update_item_amount():
+    user = User.objects.create_user(username="api20", password="pw12345")
+    client = APIClient()
+    client.force_authenticate(user=user)
+    create_response = client.post(
+        "/api/shopping-list/items/", {"ingredient_name": "Flour Api20", "amount": "2", "unit": "cup"}
+    )
+    item_id = create_response.data["id"]
+
+    response = client.patch(f"/api/shopping-list/items/{item_id}/", {"amount": "5"})
+
+    assert response.status_code == 200
+    assert Decimal(response.data["amount"]) == Decimal("5")
+
+
+def test_update_item_rejects_non_positive_amount():
+    user = User.objects.create_user(username="api21", password="pw12345")
+    client = APIClient()
+    client.force_authenticate(user=user)
+    create_response = client.post(
+        "/api/shopping-list/items/", {"ingredient_name": "Flour Api21", "amount": "2", "unit": "cup"}
+    )
+    item_id = create_response.data["id"]
+
+    response = client.patch(f"/api/shopping-list/items/{item_id}/", {"amount": "0"})
+
+    assert response.status_code == 400
+    assert response.data["code"] == "validation_error"
+
+
+def test_update_item_requires_authentication():
+    user = User.objects.create_user(username="api22", password="pw12345")
+    client = APIClient()
+    client.force_authenticate(user=user)
+    create_response = client.post(
+        "/api/shopping-list/items/", {"ingredient_name": "Flour Api22", "amount": "2", "unit": "cup"}
+    )
+    item_id = create_response.data["id"]
+
+    anonymous_client = APIClient()
+    response = anonymous_client.patch(f"/api/shopping-list/items/{item_id}/", {"amount": "5"})
+
+    assert response.status_code == 401
+
+
+def test_update_item_404_for_another_users_item():
+    owner = User.objects.create_user(username="api23", password="pw12345")
+    other = User.objects.create_user(username="api23b", password="pw12345")
+    owner_client = APIClient()
+    owner_client.force_authenticate(user=owner)
+    create_response = owner_client.post(
+        "/api/shopping-list/items/", {"ingredient_name": "Flour Api23", "amount": "2", "unit": "cup"}
+    )
+    item_id = create_response.data["id"]
+
+    other_client = APIClient()
+    other_client.force_authenticate(user=other)
+    response = other_client.patch(f"/api/shopping-list/items/{item_id}/", {"amount": "5"})
+
+    assert response.status_code == 404
+
+
+def test_delete_item():
+    user = User.objects.create_user(username="api24", password="pw12345")
+    client = APIClient()
+    client.force_authenticate(user=user)
+    create_response = client.post(
+        "/api/shopping-list/items/", {"ingredient_name": "Flour Api24", "amount": "2", "unit": "cup"}
+    )
+    item_id = create_response.data["id"]
+
+    response = client.delete(f"/api/shopping-list/items/{item_id}/")
+
+    assert response.status_code == 204
+    list_response = client.get("/api/shopping-list/")
+    assert list_response.data["items"] == []
+
+
+def test_delete_item_404_for_another_users_item():
+    owner = User.objects.create_user(username="api25", password="pw12345")
+    other = User.objects.create_user(username="api25b", password="pw12345")
+    owner_client = APIClient()
+    owner_client.force_authenticate(user=owner)
+    create_response = owner_client.post(
+        "/api/shopping-list/items/", {"ingredient_name": "Flour Api25", "amount": "2", "unit": "cup"}
+    )
+    item_id = create_response.data["id"]
+
+    other_client = APIClient()
+    other_client.force_authenticate(user=other)
+    response = other_client.delete(f"/api/shopping-list/items/{item_id}/")
+
+    assert response.status_code == 404
+    owner_list = owner_client.get("/api/shopping-list/")
+    assert len(owner_list.data["items"]) == 1
+
+
+def test_delete_item_requires_authentication():
+    user = User.objects.create_user(username="api26", password="pw12345")
+    client = APIClient()
+    client.force_authenticate(user=user)
+    create_response = client.post(
+        "/api/shopping-list/items/", {"ingredient_name": "Flour Api26", "amount": "2", "unit": "cup"}
+    )
+    item_id = create_response.data["id"]
+
+    anonymous_client = APIClient()
+    response = anonymous_client.delete(f"/api/shopping-list/items/{item_id}/")
+
+    assert response.status_code == 401
