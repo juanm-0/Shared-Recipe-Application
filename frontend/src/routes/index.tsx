@@ -17,7 +17,7 @@ const SORT_OPTIONS: { value: RecipeSort; label: string }[] = [
 
 const SORT_VALUES = SORT_OPTIONS.map((option) => option.value)
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 18
 
 interface RecipeSearch {
   sort: RecipeSort
@@ -53,7 +53,7 @@ export const Route = createFileRoute('/')({
 function HomePage() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
-  const recipesQuery = useRecipes(search)
+  const recipesQuery = useRecipes({ ...search, page_size: PAGE_SIZE })
   const tagsQuery = useTags()
   const ingredientsQuery = useIngredients()
 
@@ -94,114 +94,156 @@ function HomePage() {
   const isLastPage = search.page * PAGE_SIZE >= count
 
   return (
-    <div>
-      <h1>Recipes</h1>
-
-      <p>
-        <Link to="/recipes/new">Create recipe</Link>
-      </p>
-
-      <div>
-        <label htmlFor="sort">Sort</label>
-        <select
-          id="sort"
-          value={search.sort}
-          onChange={(event) => updateSearch({ sort: event.target.value as RecipeSort })}
+    <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-gray-900">Recipes</h1>
+        <Link
+          to="/recipes/new"
+          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
-          {SORT_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-
-        <label htmlFor="tag-filter">Tag</label>
-        <select
-          id="tag-filter"
-          value={search.tag ?? ''}
-          onChange={(event) =>
-            updateSearch({ tag: event.target.value === '' ? undefined : Number(event.target.value) })
-          }
-        >
-          <option value="">All tags</option>
-          {tagsQuery.data?.map((tag) => (
-            <option key={tag.id} value={tag.id}>
-              {tag.name}
-            </option>
-          ))}
-        </select>
-
-        <label htmlFor="ingredient-filter">Ingredient</label>
-        <select
-          id="ingredient-filter"
-          value={search.ingredient ?? ''}
-          onChange={(event) =>
-            updateSearch({
-              ingredient: event.target.value === '' ? undefined : Number(event.target.value),
-            })
-          }
-        >
-          <option value="">All ingredients</option>
-          {ingredientsQuery.data?.map((ingredient) => (
-            <option key={ingredient.id} value={ingredient.id}>
-              {ingredient.name}
-            </option>
-          ))}
-        </select>
-
-        <label htmlFor="min-rating">Min rating</label>
-        <input
-          id="min-rating"
-          type="number"
-          min={0}
-          max={5}
-          step={0.5}
-          value={minRatingInput}
-          onChange={(event) => setMinRatingInput(event.target.value)}
-        />
+          Create recipe
+        </Link>
       </div>
 
-      {recipesQuery.isPending && <p>Loading recipes...</p>}
-      {recipesQuery.isError && <p role="alert">{getErrorMessage(recipesQuery.error)}</p>}
+      <div className="mb-6 flex flex-wrap items-end gap-4 rounded-md border border-gray-200 bg-gray-50 p-4">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="sort" className="text-sm font-medium text-gray-700">
+            Sort
+          </label>
+          <select
+            id="sort"
+            value={search.sort}
+            onChange={(event) => updateSearch({ sort: event.target.value as RecipeSort })}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="tag-filter" className="text-sm font-medium text-gray-700">
+            Tag
+          </label>
+          <select
+            id="tag-filter"
+            value={search.tag ?? ''}
+            onChange={(event) =>
+              updateSearch({ tag: event.target.value === '' ? undefined : Number(event.target.value) })
+            }
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="">All tags</option>
+            {tagsQuery.data?.map((tag) => (
+              <option key={tag.id} value={tag.id}>
+                {tag.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="ingredient-filter" className="text-sm font-medium text-gray-700">
+            Ingredient
+          </label>
+          <select
+            id="ingredient-filter"
+            value={search.ingredient ?? ''}
+            onChange={(event) =>
+              updateSearch({
+                ingredient: event.target.value === '' ? undefined : Number(event.target.value),
+              })
+            }
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="">All ingredients</option>
+            {ingredientsQuery.data?.map((ingredient) => (
+              <option key={ingredient.id} value={ingredient.id}>
+                {ingredient.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="min-rating" className="text-sm font-medium text-gray-700">
+            Min rating
+          </label>
+          <input
+            id="min-rating"
+            type="number"
+            min={0}
+            max={5}
+            step={0.5}
+            value={minRatingInput}
+            onChange={(event) => setMinRatingInput(event.target.value)}
+            className="w-24 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+
+      {recipesQuery.isPending && <p className="text-sm text-gray-500">Loading recipes...</p>}
+      {recipesQuery.isError && (
+        <p role="alert" className="text-sm text-red-600">
+          {getErrorMessage(recipesQuery.error)}
+        </p>
+      )}
 
       {recipesQuery.isSuccess && (
         <>
-          <ul>
+          <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {recipesQuery.data.results.map((recipe) => (
-              <li key={recipe.id}>
-                <Link to="/recipes/$recipeId" params={{ recipeId: String(recipe.id) }} search={search}>
+              <li
+                key={recipe.id}
+                className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition hover:shadow-md"
+              >
+                <Link to="/recipes/$recipeId" params={{ recipeId: String(recipe.id) }} search={search} className="block">
                   {recipe.image ? (
-                    <img src={recipe.image} alt={recipe.name} width={120} height={120} />
+                    <img src={recipe.image} alt={recipe.name} className="aspect-square w-full object-cover" />
                   ) : (
-                    <div>No image</div>
+                    <div className="flex aspect-square w-full items-center justify-center bg-gray-100 text-sm text-gray-400">
+                      No image
+                    </div>
                   )}
-                  <div>{recipe.name}</div>
-                  <div>
-                    {recipe.average_rating !== null ? recipe.average_rating.toFixed(1) : 'No ratings yet'}
-                  </div>
-                  <div>
-                    {recipe.tags.slice(0, 3).map((tag) => (
-                      <span key={tag.id}>{tag.name}</span>
-                    ))}
+                  <div className="p-4">
+                    <h2 className="font-medium text-gray-900">{recipe.name}</h2>
+                    <p className="mt-1 text-sm text-gray-600">
+                      {recipe.average_rating !== null ? recipe.average_rating.toFixed(1) : 'No ratings yet'}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {recipe.tags.slice(0, 3).map((tag) => (
+                        <span
+                          key={tag.id}
+                          className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600"
+                        >
+                          {tag.name}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </Link>
               </li>
             ))}
           </ul>
 
-          <div>
+          <div className="mt-6 flex items-center justify-center gap-4">
             <button
               type="button"
               disabled={isFirstPage}
               onClick={() => updateSearch({ page: search.page - 1 }, false)}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Previous
             </button>
-            <span>Page {search.page}</span>
+            <span className="text-sm text-gray-700">Page {search.page}</span>
             <button
               type="button"
               disabled={isLastPage}
               onClick={() => updateSearch({ page: search.page + 1 }, false)}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Next
             </button>

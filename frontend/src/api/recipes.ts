@@ -68,6 +68,7 @@ export interface ListRecipesParams {
   owner?: number
   min_rating?: number
   page?: number
+  page_size?: number
 }
 
 export interface RecipeIngredientRead {
@@ -116,6 +117,7 @@ export function listRecipes(params: ListRecipesParams = {}): Promise<PaginatedRe
   if (params.owner !== undefined) query.set('owner', String(params.owner))
   if (params.min_rating !== undefined) query.set('min_rating', String(params.min_rating))
   if (params.page !== undefined) query.set('page', String(params.page))
+  if (params.page_size !== undefined) query.set('page_size', String(params.page_size))
 
   const queryString = query.toString()
   const path = queryString ? `/api/recipes/?${queryString}` : '/api/recipes/'
