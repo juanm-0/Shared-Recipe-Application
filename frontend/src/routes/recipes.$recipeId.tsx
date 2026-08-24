@@ -8,6 +8,7 @@ import { useCreateReview } from '../hooks/useCreateReview'
 import { useUpdateReview } from '../hooks/useUpdateReview'
 import { useDeleteReview } from '../hooks/useDeleteReview'
 import { useCopyRecipe } from '../hooks/useCopyRecipe'
+import { useImportRecipeIntoShoppingList } from '../hooks/useImportRecipeIntoShoppingList'
 import { ApiError, getErrorMessage } from '../api/client'
 import { ReviewForm } from '../components/ReviewForm'
 import type { RecipeDetail, ReviewRead } from '../api/recipes'
@@ -124,6 +125,7 @@ function RecipeDetailView({ recipeId, backLink }: { recipeId: number; backLink: 
       )}
 
       <CopyButton recipe={recipe} />
+      <AddToShoppingListButton recipeId={recipe.id} />
 
       <h2>Steps</h2>
       <ol>
@@ -291,6 +293,25 @@ function CopyButton({ recipe }: { recipe: RecipeDetail }) {
         Copy recipe
       </button>
       {copyRecipe.isError && <p role="alert">{getErrorMessage(copyRecipe.error)}</p>}
+    </p>
+  )
+}
+
+function AddToShoppingListButton({ recipeId }: { recipeId: number }) {
+  const me = useMe()
+  const importRecipe = useImportRecipeIntoShoppingList()
+
+  if (!me.data) {
+    return null
+  }
+
+  return (
+    <p>
+      <button type="button" onClick={() => importRecipe.mutate(recipeId)} disabled={importRecipe.isPending}>
+        Add to shopping list
+      </button>
+      {importRecipe.isSuccess && <span> Added to shopping list.</span>}
+      {importRecipe.isError && <p role="alert">{getErrorMessage(importRecipe.error)}</p>}
     </p>
   )
 }
