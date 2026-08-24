@@ -25,8 +25,8 @@ function NewRecipePage() {
   }
 
   return (
-    <div>
-      <h1>Create recipe</h1>
+    <div className="mx-auto max-w-2xl px-6 py-8">
+      <h1 className="mb-6 text-2xl font-semibold text-gray-900">Create recipe</h1>
       <RecipeForm
         initialValues={{ name: '', steps: [''], ingredients: [{ ingredient_name: '', amount: '', unit: 'g' }], tags: [] }}
         submitLabel="Create recipe"
@@ -47,9 +47,13 @@ function NewRecipePage() {
         }}
       />
       {createRecipe.isSuccess && createRecipe.data.imageError && (
-        <p role="alert">
+        <p role="alert" className="mt-4 text-sm text-red-600">
           Recipe saved, but the image could not be uploaded: {createRecipe.data.imageError}.{' '}
-          <Link to="/recipes/$recipeId" params={{ recipeId: String(createRecipe.data.recipe.id) }}>
+          <Link
+            to="/recipes/$recipeId"
+            params={{ recipeId: String(createRecipe.data.recipe.id) }}
+            className="text-blue-600 hover:underline"
+          >
             View recipe
           </Link>
         </p>

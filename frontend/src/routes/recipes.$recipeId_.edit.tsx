@@ -16,11 +16,15 @@ function EditRecipePage() {
 
   if (Number.isNaN(numericRecipeId)) {
     return (
-      <div>
-        <p>
-          <Link to="/">Back to recipes</Link>
+      <div className="mx-auto max-w-2xl px-6 py-8">
+        <p className="mb-4">
+          <Link to="/" className="text-sm text-gray-600 hover:text-blue-600">
+            Back to recipes
+          </Link>
         </p>
-        <p role="alert">Recipe not found.</p>
+        <p role="alert" className="text-sm text-red-600">
+          Recipe not found.
+        </p>
       </div>
     )
   }
@@ -45,8 +49,12 @@ function EditRecipeView({ recipeId }: { recipeId: number }) {
   }, [recipeQuery.data, pinnedRecipe])
 
   const backLink = (
-    <p>
-      <Link to="/recipes/$recipeId" params={{ recipeId: String(recipeId) }}>
+    <p className="mb-4">
+      <Link
+        to="/recipes/$recipeId"
+        params={{ recipeId: String(recipeId) }}
+        className="text-sm text-gray-600 hover:text-blue-600"
+      >
         Back to recipe
       </Link>
     </p>
@@ -54,18 +62,20 @@ function EditRecipeView({ recipeId }: { recipeId: number }) {
 
   if (recipeQuery.isPending) {
     return (
-      <div>
+      <div className="mx-auto max-w-2xl px-6 py-8">
         {backLink}
-        <p>Loading recipe...</p>
+        <p className="text-sm text-gray-500">Loading recipe...</p>
       </div>
     )
   }
 
   if (recipeQuery.isError) {
     return (
-      <div>
+      <div className="mx-auto max-w-2xl px-6 py-8">
         {backLink}
-        <p role="alert">{getErrorMessage(recipeQuery.error)}</p>
+        <p role="alert" className="text-sm text-red-600">
+          {getErrorMessage(recipeQuery.error)}
+        </p>
       </div>
     )
   }
@@ -74,18 +84,20 @@ function EditRecipeView({ recipeId }: { recipeId: number }) {
 
   if (recipe === null) {
     return (
-      <div>
+      <div className="mx-auto max-w-2xl px-6 py-8">
         {backLink}
-        <p>Loading recipe...</p>
+        <p className="text-sm text-gray-500">Loading recipe...</p>
       </div>
     )
   }
 
   if (!recipe.can_edit) {
     return (
-      <div>
+      <div className="mx-auto max-w-2xl px-6 py-8">
         {backLink}
-        <p role="alert">You don't have permission to edit this recipe.</p>
+        <p role="alert" className="text-sm text-red-600">
+          You don't have permission to edit this recipe.
+        </p>
       </div>
     )
   }
@@ -93,12 +105,14 @@ function EditRecipeView({ recipeId }: { recipeId: number }) {
   const isStaleWrite = updateRecipe.isError && updateRecipe.error instanceof ApiError && updateRecipe.error.code === 'stale_write'
 
   return (
-    <div>
+    <div className="mx-auto max-w-2xl px-6 py-8">
       {backLink}
-      <h1>Edit recipe</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-gray-900">Edit recipe</h1>
       {isStaleWrite && (
-        <div role="alert">
-          <p>This recipe was changed by someone else since you loaded it. Your edits below were not saved.</p>
+        <div role="alert" className="mb-6 rounded-md border border-amber-300 bg-amber-50 p-4">
+          <p className="text-sm text-amber-800">
+            This recipe was changed by someone else since you loaded it. Your edits below were not saved.
+          </p>
           <button
             type="button"
             onClick={() => {
@@ -107,6 +121,7 @@ function EditRecipeView({ recipeId }: { recipeId: number }) {
               setResetKey((k) => k + 1)
               updateRecipe.reset()
             }}
+            className="mt-2 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-100"
           >
             Reload latest version
           </button>
@@ -144,9 +159,13 @@ function EditRecipeView({ recipeId }: { recipeId: number }) {
         }}
       />
       {updateRecipe.isSuccess && updateRecipe.data.imageError && (
-        <p role="alert">
+        <p role="alert" className="mt-4 text-sm text-red-600">
           Recipe saved, but the image could not be uploaded: {updateRecipe.data.imageError}.{' '}
-          <Link to="/recipes/$recipeId" params={{ recipeId: String(recipeId) }}>
+          <Link
+            to="/recipes/$recipeId"
+            params={{ recipeId: String(recipeId) }}
+            className="text-blue-600 hover:underline"
+          >
             View recipe
           </Link>
         </p>
