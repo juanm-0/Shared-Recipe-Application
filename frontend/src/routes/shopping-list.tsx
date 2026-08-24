@@ -30,7 +30,9 @@ function ShoppingListPage() {
       {shoppingListQuery.isSuccess && (
         <>
           {shoppingListQuery.data.items.length === 0 ? (
-            <p className="text-sm text-gray-500">No items yet</p>
+            <p className="rounded-md border border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-500">
+              Your shopping list is empty.
+            </p>
           ) : (
             <ul className="flex flex-col gap-3">
               {shoppingListQuery.data.items.map((item) => (

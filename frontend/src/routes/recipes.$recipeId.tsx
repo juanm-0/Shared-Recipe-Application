@@ -242,7 +242,11 @@ function ReviewsSection({ recipe, recipeId }: { recipe: RecipeDetail; recipeId: 
 
       {!myReview && me.isSuccess && <NewReviewForm createReview={createReview} />}
 
-      {recipe.reviews.length === 0 && <p className="mt-2 text-sm text-gray-500">No reviews yet</p>}
+      {recipe.reviews.length === 0 && (
+        <p className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-500">
+          No reviews yet.
+        </p>
+      )}
 
       {otherReviews.length > 0 && (
         <ul className="mt-4 space-y-4">
