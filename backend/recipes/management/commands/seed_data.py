@@ -9,6 +9,7 @@ from django.db import transaction
 from faker import Faker
 
 from recipes.models import Ingredient, Recipe, RecipeIngredient, RecipeTag, Review, Tag
+from recipes.services import recompute_all_rating_aggregates
 from recipes.utils import get_or_create_ci
 from shopping_list.models import ShoppingListItem
 from shopping_list.services import import_recipe_into_shopping_list, merge_or_create_item
@@ -169,7 +170,9 @@ class Command(BaseCommand):
                         comment=fake.sentence(nb_words=10),
                     )
                 )
-        return Review.objects.bulk_create(new_reviews)
+        created = Review.objects.bulk_create(new_reviews)
+        recompute_all_rating_aggregates([recipe.pk for recipe in recipes])
+        return created
 
     def _seed_shopping_lists(self, users, recipes):
         if not recipes:

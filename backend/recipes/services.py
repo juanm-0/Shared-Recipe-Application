@@ -1,5 +1,5 @@
 from django.db import models, transaction
-from django.db.models import Avg, Count, Subquery, Value
+from django.db.models import Avg, Count, OuterRef, Subquery, Value
 from django.db.models.functions import Coalesce
 
 from .models import Recipe, RecipeIngredient, RecipeTag, Review
@@ -39,6 +39,23 @@ def recompute_rating_aggregate(recipe_id):
     count_subquery = reviews_for_recipe.values("recipe_id").annotate(v=Count("id")).values("v")
 
     Recipe.objects.filter(pk=recipe_id).update(
+        avg_rating=Subquery(avg_subquery),
+        review_count=Coalesce(
+            Subquery(count_subquery, output_field=models.PositiveIntegerField()),
+            Value(0),
+        ),
+    )
+
+
+def recompute_all_rating_aggregates(recipe_ids):
+    """Bulk version of recompute_rating_aggregate for many recipes at once.
+    used by seed_data
+    """
+    reviews = Review.objects.filter(recipe_id=OuterRef("pk"))
+    avg_subquery = reviews.values("recipe_id").annotate(v=Avg("rating")).values("v")
+    count_subquery = reviews.values("recipe_id").annotate(v=Count("id")).values("v")
+
+    Recipe.objects.filter(pk__in=recipe_ids).update(
         avg_rating=Subquery(avg_subquery),
         review_count=Coalesce(
             Subquery(count_subquery, output_field=models.PositiveIntegerField()),
