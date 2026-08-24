@@ -23,8 +23,8 @@ function RecipeDetailPage() {
   const numericRecipeId = Number(recipeId)
 
   const backLink = (
-    <p>
-      <Link to="/" search={(prev) => prev}>
+    <p className="mb-4">
+      <Link to="/" search={(prev) => prev} className="text-sm text-gray-600 hover:text-blue-600">
         Back to recipes
       </Link>
     </p>
@@ -32,9 +32,11 @@ function RecipeDetailPage() {
 
   if (Number.isNaN(numericRecipeId)) {
     return (
-      <div>
+      <div className="mx-auto max-w-4xl px-6 py-8">
         {backLink}
-        <p role="alert">Recipe not found.</p>
+        <p role="alert" className="text-sm text-red-600">
+          Recipe not found.
+        </p>
       </div>
     )
   }
@@ -49,18 +51,20 @@ function RecipeDetailView({ recipeId, backLink }: { recipeId: number; backLink: 
 
   if (recipeQuery.isPending) {
     return (
-      <div>
+      <div className="mx-auto max-w-4xl px-6 py-8">
         {backLink}
-        <p>Loading recipe...</p>
+        <p className="text-sm text-gray-500">Loading recipe...</p>
       </div>
     )
   }
 
   if (recipeQuery.isError) {
     return (
-      <div>
+      <div className="mx-auto max-w-4xl px-6 py-8">
         {backLink}
-        <p role="alert">{getErrorMessage(recipeQuery.error)}</p>
+        <p role="alert" className="text-sm text-red-600">
+          {getErrorMessage(recipeQuery.error)}
+        </p>
       </div>
     )
   }
@@ -79,25 +83,34 @@ function RecipeDetailView({ recipeId, backLink }: { recipeId: number; backLink: 
   }
 
   return (
-    <div>
+    <div className="mx-auto max-w-4xl px-6 py-8">
       {backLink}
 
-      <h1>{recipe.name}</h1>
-
       {recipe.image ? (
-        <img src={recipe.image} alt={recipe.name} width={300} height={300} />
+        <img
+          src={recipe.image}
+          alt={recipe.name}
+          className="aspect-square w-full max-w-md rounded-lg object-cover"
+        />
       ) : (
-        <div>No image</div>
+        <div className="flex aspect-square w-full max-w-md items-center justify-center rounded-lg bg-gray-100 text-sm text-gray-400">
+          No image
+        </div>
       )}
 
-      <p>By {recipe.owner}</p>
+      <h1 className="mt-4 text-3xl font-semibold text-gray-900">{recipe.name}</h1>
+      <p className="mt-1 text-sm text-gray-600">By {recipe.owner}</p>
 
       {(recipe.original_recipe !== null || recipe.original_owner !== null) && (
-        <p>
+        <p className="mt-2 text-sm italic text-gray-500">
           {recipe.original_recipe !== null ? (
             <>
               This is a copy of{' '}
-              <Link to="/recipes/$recipeId" params={{ recipeId: String(recipe.original_recipe) }}>
+              <Link
+                to="/recipes/$recipeId"
+                params={{ recipeId: String(recipe.original_recipe) }}
+                className="not-italic text-blue-600 hover:underline"
+              >
                 the original recipe
               </Link>
               , originally by{' '}
@@ -112,29 +125,43 @@ function RecipeDetailView({ recipeId, backLink }: { recipeId: number; backLink: 
         </p>
       )}
 
-      {recipe.can_edit && (
-        <p>
-          <Link to="/recipes/$recipeId/edit" params={{ recipeId: String(recipe.id) }}>
-            Edit
-          </Link>
-          <button type="button" onClick={handleDelete} disabled={deleteRecipe.isPending}>
-            Delete
-          </button>
-          {deleteRecipe.isError && <p role="alert">{getErrorMessage(deleteRecipe.error)}</p>}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {recipe.can_edit && (
+          <>
+            <Link
+              to="/recipes/$recipeId/edit"
+              params={{ recipeId: String(recipe.id) }}
+              className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Edit
+            </Link>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleteRecipe.isPending}
+              className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          </>
+        )}
+        <CopyButton recipe={recipe} />
+        <AddToShoppingListButton recipeId={recipe.id} />
+      </div>
+      {recipe.can_edit && deleteRecipe.isError && (
+        <p role="alert" className="mt-2 text-sm text-red-600">
+          {getErrorMessage(deleteRecipe.error)}
         </p>
       )}
 
-      <CopyButton recipe={recipe} />
-      <AddToShoppingListButton recipeId={recipe.id} />
-
-      <h2>Steps</h2>
+      <h2 className="mt-8 text-lg font-semibold text-gray-900">Steps</h2>
       <ol>
         {recipe.steps.map((step, index) => (
           <li key={index}>{step}</li>
         ))}
       </ol>
 
-      <h2>Ingredients</h2>
+      <h2 className="mt-8 text-lg font-semibold text-gray-900">Ingredients</h2>
       <ul>
         {recipe.ingredients.map((ingredient) => (
           <li key={ingredient.order}>
@@ -143,7 +170,7 @@ function RecipeDetailView({ recipeId, backLink }: { recipeId: number; backLink: 
         ))}
       </ul>
 
-      <h2>Tags</h2>
+      <h2 className="mt-8 text-lg font-semibold text-gray-900">Tags</h2>
       <ul>
         {recipe.tags.map((tag) => (
           <li key={tag.id}>{tag.name}</li>
@@ -278,7 +305,7 @@ function CopyButton({ recipe }: { recipe: RecipeDetail }) {
   }
 
   return (
-    <p>
+    <div className="relative">
       <button
         type="button"
         onClick={() => {
@@ -289,11 +316,16 @@ function CopyButton({ recipe }: { recipe: RecipeDetail }) {
           })
         }}
         disabled={copyRecipe.isPending}
+        className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
       >
         Copy recipe
       </button>
-      {copyRecipe.isError && <p role="alert">{getErrorMessage(copyRecipe.error)}</p>}
-    </p>
+      {copyRecipe.isError && (
+        <p role="alert" className="absolute left-0 top-full mt-1 w-max max-w-xs text-sm text-red-600">
+          {getErrorMessage(copyRecipe.error)}
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -306,12 +338,25 @@ function AddToShoppingListButton({ recipeId }: { recipeId: number }) {
   }
 
   return (
-    <p>
-      <button type="button" onClick={() => importRecipe.mutate(recipeId)} disabled={importRecipe.isPending}>
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => importRecipe.mutate(recipeId)}
+        disabled={importRecipe.isPending}
+        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+      >
         Add to shopping list
       </button>
-      {importRecipe.isSuccess && <span> Added to shopping list.</span>}
-      {importRecipe.isError && <p role="alert">{getErrorMessage(importRecipe.error)}</p>}
-    </p>
+      {importRecipe.isSuccess && (
+        <span className="absolute left-0 top-full mt-1 w-max text-sm text-green-600">
+          Added to shopping list.
+        </span>
+      )}
+      {importRecipe.isError && (
+        <p role="alert" className="absolute left-0 top-full mt-1 w-max max-w-xs text-sm text-red-600">
+          {getErrorMessage(importRecipe.error)}
+        </p>
+      )}
+    </div>
   )
 }
