@@ -195,30 +195,39 @@ function ReviewsSection({ recipe, recipeId }: { recipe: RecipeDetail; recipeId: 
 
   return (
     <div>
-      <h2>Reviews</h2>
+      <h2 className="mt-8 text-lg font-semibold text-gray-900">Reviews</h2>
 
       {myReview && !isEditingReview && (
-        <div>
-          <strong>Your review</strong>
-          <p>{myReview.rating}/5</p>
-          {myReview.comment && <p>{myReview.comment}</p>}
-          <button type="button" onClick={() => setIsEditingReview(true)}>
-            Edit
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (window.confirm('Delete your review?')) {
-                deleteReview.mutate(myReview.id)
-              }
-            }}
-            disabled={deleteReview.isPending}
-          >
-            Delete
-          </button>
+        <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 p-4">
+          <p className="text-sm font-medium text-gray-900">Your review</p>
+          <p className="mt-1 text-sm text-amber-500">★ {myReview.rating}/5</p>
+          {myReview.comment && <p className="mt-1 text-sm text-gray-700">{myReview.comment}</p>}
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsEditingReview(true)}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Delete your review?')) {
+                  deleteReview.mutate(myReview.id)
+                }
+              }}
+              disabled={deleteReview.isPending}
+              className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          </div>
           {deleteReview.isError &&
             !(deleteReview.error instanceof ApiError && deleteReview.error.status === 404) && (
-              <p role="alert">{getErrorMessage(deleteReview.error)}</p>
+              <p role="alert" className="mt-2 text-sm text-red-600">
+                {getErrorMessage(deleteReview.error)}
+              </p>
             )}
         </div>
       )}
@@ -233,14 +242,15 @@ function ReviewsSection({ recipe, recipeId }: { recipe: RecipeDetail; recipeId: 
 
       {!myReview && me.isSuccess && <NewReviewForm createReview={createReview} />}
 
-      {recipe.reviews.length === 0 && <p>No reviews yet</p>}
+      {recipe.reviews.length === 0 && <p className="mt-2 text-sm text-gray-500">No reviews yet</p>}
 
       {otherReviews.length > 0 && (
-        <ul>
+        <ul className="mt-4 space-y-4">
           {otherReviews.map((review) => (
-            <li key={review.id}>
-              <strong>{review.username}</strong> - {review.rating}/5
-              {review.comment && <p>{review.comment}</p>}
+            <li key={review.id} className="border-t border-gray-200 pt-4">
+              <p className="text-sm font-medium text-gray-900">{review.username}</p>
+              <p className="mt-1 text-sm text-amber-500">★ {review.rating}/5</p>
+              {review.comment && <p className="mt-1 text-sm text-gray-700">{review.comment}</p>}
             </li>
           ))}
         </ul>
