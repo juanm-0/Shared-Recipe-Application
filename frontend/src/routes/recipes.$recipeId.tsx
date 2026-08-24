@@ -185,7 +185,10 @@ function ReviewsSection({ recipe, recipeId }: { recipe: RecipeDetail; recipeId: 
           >
             Delete
           </button>
-          {deleteReview.isError && <p role="alert">{getErrorMessage(deleteReview.error)}</p>}
+          {deleteReview.isError &&
+            !(deleteReview.error instanceof ApiError && deleteReview.error.status === 404) && (
+              <p role="alert">{getErrorMessage(deleteReview.error)}</p>
+            )}
         </div>
       )}
 
@@ -250,7 +253,11 @@ function EditReviewForm({
       initialValues={{ rating: review.rating, comment: review.comment }}
       submitLabel="Save review"
       isPending={updateReview.isPending}
-      errorMessage={updateReview.isError ? getErrorMessage(updateReview.error) : undefined}
+      errorMessage={
+        updateReview.isError && !(updateReview.error instanceof ApiError && updateReview.error.status === 404)
+          ? getErrorMessage(updateReview.error)
+          : undefined
+      }
       onCancel={onDone}
       onSubmit={(data) => {
         updateReview.mutate(data, { onSuccess: onDone })
