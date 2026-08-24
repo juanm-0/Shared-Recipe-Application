@@ -19,7 +19,7 @@ class IngredientSerializer(serializers.ModelSerializer):
         fields = ["id", "name"]
 
 class RecipeListSerializer(serializers.ModelSerializer):
-    average_rating = serializers.FloatField(read_only=True, allow_null=True)
+    average_rating = serializers.FloatField(source="avg_rating", read_only=True, allow_null=True)
     review_count = serializers.IntegerField(read_only=True)
     tags = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()

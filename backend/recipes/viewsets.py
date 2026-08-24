@@ -1,4 +1,4 @@
-from django.db.models import Avg, Count, F, Prefetch
+from django.db.models import F, Prefetch
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -121,10 +121,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         )
 
     def _list_queryset(self):
-        return Recipe.objects.annotate(
-            average_rating=Avg("reviews__rating"),
-            review_count=Count("reviews", distinct=True),
-        ).prefetch_related(
+        return Recipe.objects.prefetch_related(
             Prefetch(
                 "recipe_tags",
                 queryset=RecipeTag.objects.select_related("tag").order_by("order"),
@@ -148,14 +145,14 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         min_rating = _float_param(params, "min_rating")
         if min_rating is not None:
-            queryset = queryset.filter(average_rating__gte=min_rating)
+            queryset = queryset.filter(avg_rating__gte=min_rating)
 
         return queryset
 
     def _apply_sort(self, queryset):
         sort = self.request.query_params.get("sort", "-created_at")
         if sort == "rating":
-            return queryset.order_by(F("average_rating").asc(nulls_last=True), "-pk")
+            return queryset.order_by(F("avg_rating").asc(nulls_last=True), "-pk")
         if sort == "-rating":
-            return queryset.order_by(F("average_rating").desc(nulls_last=True), "-pk")
+            return queryset.order_by(F("avg_rating").desc(nulls_last=True), "-pk")
         return queryset.order_by(SORT_FIELDS.get(sort, "-created_at"), "-pk")
