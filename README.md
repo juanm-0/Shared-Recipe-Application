@@ -107,9 +107,13 @@ Some notes that consider how the system handles a larger data set. This can be c
 - Indexing on filterable and sorted columns
 
 #### Review and Rating Count
-- The average rating and review count are currently computed at read time. Every list request joins Recipe to all Review and does a GROUP BY which scales with total review count. 
+- Initially, the average rating and review count were currently computed at read time. Every list request joins Recipe to all Review and does a GROUP BY which scales with total review count. 
   - EXPLAIN ANALYZE measured that the dominant cost of the RecipeViewSet query path is the GroupAggregate that computes the average rating
-- Performance here can be improved by computing at write time, storing avg_rating and review_count as real columns on Recipe. We choose this tradeoff as the list of recipes is heavier on reads, while reviews are written less
+- Performance was improved by computing at write time, storing avg_rating and review_count as real columns on Recipe. We choose this tradeoff as the list of recipes is heavier on reads, while reviews are written less
+  - before/after data (5000 recipes, 12000 reviews):
+    > homepage query speed: 36.1ms vs 0.184ms
+    > filter by rating: 22.7ms vs 1.758ms
+    > sort by name: 31.0ms vs 0.170ms (with index added)
 
 ## Project Structure
 
