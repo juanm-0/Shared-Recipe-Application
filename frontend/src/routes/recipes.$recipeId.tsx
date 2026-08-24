@@ -155,14 +155,14 @@ function RecipeDetailView({ recipeId, backLink }: { recipeId: number; backLink: 
       )}
 
       <h2 className="mt-8 text-lg font-semibold text-gray-900">Steps</h2>
-      <ol>
+      <ol className="mt-2 list-decimal space-y-2 pl-5 text-gray-700">
         {recipe.steps.map((step, index) => (
           <li key={index}>{step}</li>
         ))}
       </ol>
 
       <h2 className="mt-8 text-lg font-semibold text-gray-900">Ingredients</h2>
-      <ul>
+      <ul className="mt-2 list-disc space-y-1 pl-5 text-gray-700">
         {recipe.ingredients.map((ingredient) => (
           <li key={ingredient.order}>
             {ingredient.amount} {ingredient.unit} {ingredient.ingredient_name}
@@ -171,9 +171,11 @@ function RecipeDetailView({ recipeId, backLink }: { recipeId: number; backLink: 
       </ul>
 
       <h2 className="mt-8 text-lg font-semibold text-gray-900">Tags</h2>
-      <ul>
+      <ul className="mt-2 flex flex-wrap gap-2">
         {recipe.tags.map((tag) => (
-          <li key={tag.id}>{tag.name}</li>
+          <li key={tag.id} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+            {tag.name}
+          </li>
         ))}
       </ul>
 
