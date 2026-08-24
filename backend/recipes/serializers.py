@@ -1,7 +1,7 @@
 from concurrency.exceptions import RecordModifiedError
 from django.db import IntegrityError, transaction
 from rest_framework import serializers
-from accounts.permissions import is_owner_or_staff
+from accounts.permissions import is_owner_or_has_permission
 from .exceptions import DuplicateReview, StaleWrite, TagLimitExceeded
 from .models import Ingredient, Recipe, RecipeIngredient, RecipeTag, Review, Tag
 from .utils import get_or_create_ci
@@ -84,7 +84,7 @@ class RecipeDetailSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if request is None or not request.user.is_authenticated:
             return False
-        return is_owner_or_staff(request.user, obj)
+        return is_owner_or_has_permission(request.user, obj)
 
     def get_original_owner(self, obj):
         if obj.original_owner is None:

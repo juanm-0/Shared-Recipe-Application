@@ -1,5 +1,6 @@
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
 from recipes.models import Recipe, Review
@@ -138,7 +139,7 @@ def test_review_delete_rejects_non_author():
     assert Review.objects.filter(id=review.id).exists()
 
 
-def test_staff_can_update_any_review():
+def test_staff_without_admin_group_cannot_update_others_review():
     owner = User.objects.create_user(username="chef10", password="pw12345")
     reviewer = User.objects.create_user(username="reviewer10", password="pw12345")
     staff = User.objects.create_user(username="staff10", password="pw12345", is_staff=True)
@@ -147,6 +148,22 @@ def test_staff_can_update_any_review():
 
     client = APIClient()
     client.force_authenticate(user=staff)
+    response = client.patch(
+        f"/api/recipes/{recipe.id}/reviews/{review.id}/", {"rating": 1}, format="json"
+    )
+    assert response.status_code == 403
+
+
+def test_admin_group_member_can_update_any_review():
+    owner = User.objects.create_user(username="chef11", password="pw12345")
+    reviewer = User.objects.create_user(username="reviewer11", password="pw12345")
+    moderator = User.objects.create_user(username="moderator11", password="pw12345")
+    moderator.groups.add(Group.objects.get(name="Admin"))
+    recipe = _make_recipe(owner)
+    review = Review.objects.create(recipe=recipe, user=reviewer, rating=3, comment="Ok")
+
+    client = APIClient()
+    client.force_authenticate(user=moderator)
     response = client.patch(
         f"/api/recipes/{recipe.id}/reviews/{review.id}/", {"rating": 1}, format="json"
     )

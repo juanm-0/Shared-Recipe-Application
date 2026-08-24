@@ -1,21 +1,18 @@
 from rest_framework.permissions import BasePermission
 
+ACTION_BY_METHOD = {
+    "DELETE": "delete",
+}
 
-def is_owner_or_staff(user, obj):
-    """Object-level permission for resources that are publicly visible but
-    owner-restricted for writes (e.g. Recipe, Review).
 
-    Not for shopping lists where a non-owner should get 404 rather than 403
-    (exists but forbidden) need queryset-scoping instead.
-    """
-    if user.is_staff:
-        return True
+def is_owner_or_has_permission(user, obj, action="change"):
     owner = getattr(obj, "owner", None) or getattr(obj, "user", None)
-    return owner == user
+    if owner == user:
+        return True
+    return user.has_perm(f"{obj._meta.app_label}.{action}_{obj._meta.model_name}")
 
 
-class IsOwnerOrStaff(BasePermission):
-    """DRF permission wrapper around is_owner_or_staff()."""
-
+class IsOwnerOrHasPermission(BasePermission):
     def has_object_permission(self, request, view, obj):
-        return is_owner_or_staff(request.user, obj)
+        action = ACTION_BY_METHOD.get(request.method, "change")
+        return is_owner_or_has_permission(request.user, obj, action=action)

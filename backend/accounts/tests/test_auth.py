@@ -19,6 +19,17 @@ def test_register_creates_user_and_logs_in():
     assert "_auth_user_id" in client.session
 
 
+def test_register_assigns_user_group():
+    client = APIClient()
+    client.post(
+        "/api/auth/register/",
+        {"username": "groupedchef", "email": "groupedchef@example.com", "password": "a-strong-password-1"},
+        format="json",
+    )
+    user = User.objects.get(username="groupedchef")
+    assert list(user.groups.values_list("name", flat=True)) == ["User"]
+
+
 def test_register_rejects_duplicate_username():
     User.objects.create_user(username="dupe", email="dupe@example.com", password="a-strong-password-1")
     client = APIClient()

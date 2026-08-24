@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from faker import Faker
@@ -113,7 +114,21 @@ class Command(BaseCommand):
                 username = fake.unique.user_name()
             existing_usernames.add(username)
             new_users.append(User(username=username, email=fake.unique.email(), password=hashed_password))
-        return User.objects.bulk_create(new_users)
+        users = User.objects.bulk_create(new_users)
+        self._assign_groups(users)
+        return users
+
+    def _assign_groups(self, users, admin_count=2):
+        if not users:
+            return
+        admin_group, _ = Group.objects.get_or_create(name="Admin")
+        user_group, _ = Group.objects.get_or_create(name="User")
+        admins, regular = users[:admin_count], users[admin_count:]
+        Membership = User.groups.through
+        Membership.objects.bulk_create(
+            [Membership(user_id=u.pk, group_id=admin_group.pk) for u in admins]
+            + [Membership(user_id=u.pk, group_id=user_group.pk) for u in regular]
+        )
 
     def _seed_recipes(self, count, users, fake):
         if not users:

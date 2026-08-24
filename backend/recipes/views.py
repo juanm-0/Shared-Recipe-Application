@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import IsOwnerOrStaff
+from accounts.permissions import IsOwnerOrHasPermission
 
 from .models import Recipe, Review
 from .serializers import ReviewReadSerializer, ReviewWriteSerializer
@@ -25,7 +25,7 @@ class ReviewCreateView(APIView):
 
 
 class ReviewDetailView(APIView):
-    permission_classes = [IsAuthenticated, IsOwnerOrStaff]
+    permission_classes = [IsAuthenticated, IsOwnerOrHasPermission]
 
     def _get_review(self, recipe_id, review_id):
         review = get_object_or_404(Review, pk=review_id, recipe_id=recipe_id)

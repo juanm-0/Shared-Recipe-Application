@@ -6,7 +6,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 
-from accounts.permissions import IsOwnerOrStaff
+from accounts.permissions import IsOwnerOrHasPermission
 from .models import Ingredient, Recipe, RecipeIngredient, RecipeTag, Review, Tag
 from .serializers import (
     IngredientSerializer,
@@ -69,7 +69,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in OWNER_ONLY_ACTIONS:
-            return [IsAuthenticatedOrReadOnly(), IsOwnerOrStaff()]
+            return [IsAuthenticatedOrReadOnly(), IsOwnerOrHasPermission()]
         return [permission() for permission in self.permission_classes]
 
     def get_serializer_class(self):
