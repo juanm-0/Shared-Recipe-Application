@@ -32,6 +32,16 @@ Should start containers for:
 - backend: Django
 - frontend: Vite
 
+App is located at: http://localhost:5173 
+Django Admin is located at: http://localhost:8000/admin/ 
+  - for direct database management and assigning users to the `Admin`/`User` groups. It requires an `is_staff` account which can be created using this command:
+
+```
+docker compose exec backend python manage.py createsuperuser
+```
+
+`seed_data` also produces `Admin`-group accounts, but are not `is_staff` and can't log into `/admin/`. Only a superuser or a manually-promoted account can. See [Groups/Permissions](#groupspermissions) Design Decisions.
+
 ## Seeding Data
 
 ```
@@ -42,6 +52,7 @@ docker compose exec backend python manage.py seed_data
 - `--users=N` / `--recipes=N` to generate larger (or smaller) data sets. `--recipes` alone (with `--users=0`) adds recipes against the existing seeded users rather than requiring new ones.
 - `--clear` deletes existing seed data (non-staff users and everything of theirs) and unreferenced catalog rows before reseeding — staff/superuser accounts, and anything they own, are preserved
 - All seeded users share one password, `seedpass123`, printed on completion
+- Users are assigned to Admin/User groups. First two users go to Admin
 
 ## API Reference
 
@@ -56,7 +67,7 @@ The following error codes are returned in the API response body and will grow as
 |---|---|---|
 | `not_authenticated` | 401 | No valid session. Call `/api/auth/login/` first |
 | `authentication_failed` | 401 | Login credentials were wrong (doesn't say which field) |
-| `permission_denied` | 403 | Authenticated, but not the owner/staff |
+| `permission_denied` | 403 | Authenticated, but does not have the matching Django permission |
 | `not_found` | 404 | Resource doesn't exist (or exists but isn't yours) |
 | `validation_error` | 400 | Field-level validation failed — see the `errors` object in the response body |
 
@@ -72,6 +83,7 @@ An interface on top of the ORM is unnecessary, and PostgreSQL is not something t
 The following are the rules of the system as per the provided document
 - One review per user per recipe
 - Max of five tags per recipe
+- Admin users can edit and delete any recipe, tag, or ingredient
 
 Rules will be enforced at the model or serializer layer, while the view only needs to parse, delegate, and map results. 
 Database constraints like `unique_together` for one review per user along with serializer-layer checks also ensures the user can see clean error messages.
@@ -101,12 +113,14 @@ However, I chose a client-side rendered React SPA for the following reasons:
 
 ### Performance at Scale
 
-Some notes that consider how the system handles a larger data set. This can be checked against real numbers via the seeding parameters
+Some notes that consider how the system handles a larger data set. Actual measured scale was at 5000~ recipes and 12500~ reviews
 - Recipe grid endpoint returns a lighter payload
 - Avoid N+1 query patterns as dataset grows using `select_related` or `prefetch_related`
 - Indexing on filterable and sorted columns
 
-#### Review and Rating Count
+Additional performance improvement was gained in [Review and Rating Coung](#Review-and-Rating-Count) section below
+
+### Review and Rating Count
 - Initially, the average rating and review count were currently computed at read time. Every list request joins Recipe to all Review and does a GROUP BY which scales with total review count. 
   - EXPLAIN ANALYZE measured that the dominant cost of the RecipeViewSet query path is the GroupAggregate that computes the average rating
 - Performance was improved by computing at write time, storing avg_rating and review_count as real columns on Recipe. We choose this tradeoff as the list of recipes is heavier on reads, while reviews are written less
@@ -114,6 +128,10 @@ Some notes that consider how the system handles a larger data set. This can be c
     > homepage query speed: 36.1ms vs 0.184ms
     > filter by rating: 22.7ms vs 1.758ms
     > sort by name: 31.0ms vs 0.170ms (with index added)
+
+### Groups/Permissions
+
+`is_staff` and Admin group membership are two separate concerns. `is_staff` is what determines if users can login to `/admin/`. The authorization scope is based on `has_perm` via the group the user belongs in.
 
 ## Project Structure
 
@@ -137,10 +155,11 @@ Below is the scope of the project, as well as what would fall out of scope for t
 ### In Scope
 - Full Recipe CRUD with ownership enforcement
 - Structured ingredients and tags
+- Recipe Grid (image, name, rating, tags, sort/filter)
 - Reviewing recipes
 - Recipe copying with tracking of origin
 - Personal shopping list with recipe-import and manual ingredient entry
-- Django Admin for staff management
+- Django Admin for group management, recipe, tag, ingredient, and review moderation
 
 ### Out of Scope
 - Unit Conversion Aware for merging shopping list items
@@ -160,3 +179,6 @@ Related to the above Out of Scope items:
 - Login and register are not rate-limited. A production deployment would add DRF throttling (`AnonRateThrottle`) to both endpoints to handle any brute-force/credential-stuffing attempts
 - `get_or_create_ci` (tag/ingredient resolution on recipe create/update) issues one SELECT, plus a possible INSERT, per submitted name. Fine for a single recipe's ingredient list typed by hand through the API, but could be a concern for recipes with a lot of ingredients. The fix is the standard bulk get-or-create/upsert pattern: one query to fetch existing matches (`annotate(Lower("name"))` + `filter(__in=...)`), then `bulk_create(..., ignore_conflicts=True)` for whatever's missing to reduce to 2-3 queries total regardless of row count, instead of up to 2N. A true single-query Postgres upsert (`INSERT ... ON CONFLICT ... RETURNING`) is also possible via the third-party `django-postgres-extra` package's `on_conflict()`, but Django core's `bulk_create` + a follow-up lookup covers this without adding a dependency.
 - Editing or removing individual shopping-list items, and checking items off (`ShoppingListItem.is_checked` exists on the model but isn't exposed via the API). Editing, removing, and checking off were deferred to get full coverage of the stated requirements first
+- Catalog search for Tags/Ingredients is currently search-with-limit and not pagination. This should be revisited if the list grows much larger past the seed set
+- CRUD API + frontend UI for Tags and Ingredients. Currently managed through Django Admin, but could be worthwhile for Admins or Users with permissions to access this feature for future iterations
+
