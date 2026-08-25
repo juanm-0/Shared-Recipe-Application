@@ -31,20 +31,10 @@ def copy_recipe(original_recipe, new_owner):
 def recompute_rating_aggregate(recipe_id):
     """Recompute recipe avg_rating/review_count in a single UPDATE.
 
-    Single UPDATE ... WHERE id=x version to avoid a failure where 
+    Single UPDATE ... WHERE id=x version to avoid a failure where
     two reviews are written at the same time for a recipe
     """
-    reviews_for_recipe = Review.objects.filter(recipe_id=recipe_id)
-    avg_subquery = reviews_for_recipe.values("recipe_id").annotate(v=Avg("rating")).values("v")
-    count_subquery = reviews_for_recipe.values("recipe_id").annotate(v=Count("id")).values("v")
-
-    Recipe.objects.filter(pk=recipe_id).update(
-        avg_rating=Subquery(avg_subquery),
-        review_count=Coalesce(
-            Subquery(count_subquery, output_field=models.PositiveIntegerField()),
-            Value(0),
-        ),
-    )
+    recompute_all_rating_aggregates([recipe_id])
 
 
 def recompute_all_rating_aggregates(recipe_ids):
